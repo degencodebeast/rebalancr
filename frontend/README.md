@@ -6,12 +6,12 @@ AI-powered portfolio rebalancing for DeFi investors. This frontend application p
 
 1. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. Run the development server:
    ```bash
-   npm run dev
+   pnpm dev
    ```
 
 3. Open [http://localhost:3000](http://localhost:3000) in your browser
@@ -41,4 +41,30 @@ The project follows a feature-based organization:
 
 ## Testing WebSocket Connection
 
-Visit the `/dashboard` page to test WebSocket connectivity with the backend server.
+### Frontend Testing
+Visit the `/websocket-test` page to test WebSocket connectivity with the backend server. This page provides:
+- Connection status indicator
+- Automatic test message on connection
+- Message log display
+
+### Alternative Testing Methods
+
+#### Browser Console
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws');
+ws.onopen = () => console.log('Connected!');
+ws.onmessage = (event) => console.log('Received:', JSON.parse(event.data));
+ws.send(JSON.stringify({type: 'get_portfolio'}));
+```
+
+#### Command Line (wscat)
+```bash
+# Install wscat
+npm install -g wscat
+
+# Connect and test
+wscat -c ws://localhost:8000/ws
+> {"type":"get_portfolio"}
+```
+
+Make sure your FastAPI backend server is running before testing WebSocket connections.
