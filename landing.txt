@@ -43,8 +43,8 @@
 │  │ assets across │  │ dashboards    │  │ strategies    │           │
 │  │ DeFi          │  │ and metrics   │  │ with friends  │           │
 │  └───────────────┘  └───────────────┘  └───────────────┘           │
-│                                                                     │
-├─────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  HOW IT WORKS                                                       │
 │  ━━━━━━━━━━━━━                                                      │
@@ -63,7 +63,7 @@
 │  ━━━━━━━━━━━━                                                       │
 │                                                                     │
 │  Powered by                                                         │
-│  [Coinbase AgentKit logo] [Curvance logo] [Allora logo]            │
+│  [Coinbase AgentKit logo] [Curvance logo] [Allora logo]             │
 │  [Wormhole logo] [Claude AI logo]                                   │
 │                                                                     │
 │  Rebalancr combines cutting-edge technologies to deliver a          │
