@@ -4,13 +4,13 @@ from typing import Optional, Dict, List
 import json
 
 from rebalancr.api.websocket import connection_manager
-from rebalancr.services.chat import ChatService
-from rebalancr.services.portfolio import PortfolioService
-from rebalancr.services.user import UserService
-from rebalancr.services.market import MarketService
+# from rebalancr.services.chat import ChatService
+# from rebalancr.services.portfolio import PortfolioService
+# from rebalancr.services.user import UserService
+# from rebalancr.services.market import MarketService
 
 # Import all route modules
-from rebalancr.api.routes import portfolio, market, chat, user, social, achievement
+# from rebalancr.api.routes import portfolio, market, chat, user, social, achievement
 
 app = FastAPI(
     title="Rebalancr API",
@@ -35,10 +35,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-chat_service = ChatService()
-portfolio_service = PortfolioService()
-user_service = UserService()
-market_service = MarketService()
+# chat_service = ChatService()
+# portfolio_service = PortfolioService()
+# user_service = UserService()
+# market_service = MarketService()
 
 # # Auth dependency - simplified for hackathon
 # async def get_user_from_token(token: str = Query(...)):
@@ -47,12 +47,12 @@ market_service = MarketService()
 #     return token
 
 # Include all routers
-app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
-app.include_router(market.router, prefix="/api/market", tags=["Market"])
-app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
-app.include_router(user.router, prefix="/api/user", tags=["User"])
-app.include_router(social.router, prefix="/api/social", tags=["Social"])
-app.include_router(achievement.router, prefix="/api/achievement", tags=["Achievement"])
+# app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
+# app.include_router(market.router, prefix="/api/market", tags=["Market"])
+# app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+# app.include_router(user.router, prefix="/api/user", tags=["User"])
+# app.include_router(social.router, prefix="/api/social", tags=["Social"])
+# app.include_router(achievement.router, prefix="/api/achievement", tags=["Achievement"])
 
 # WebSocket Authentication
 async def get_token(
