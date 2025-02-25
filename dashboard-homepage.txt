@@ -1,0 +1,37 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│  HEADER: Logo | Navigation | Notifications | User Profile           │
+├─────────────────────┬─────────────────────┬─────────────────────────┤
+│                     │                     │                         │
+│  PORTFOLIO SUMMARY  │  STRATEGY ASSISTANT │  MARKET CONDITIONS      │
+│  $XX,XXX Total      │                     │                         │
+│  ▲ X.X% Today       │  "Based on current  │  • BTC: $XX,XXX ▲2.3%   │
+│  Asset allocation   │   market conditions │  • ETH: $X,XXX ▼1.2%    │
+│  chart with key     │   and your goals,   │  • Market Volatility:   │
+│  percentages        │   consider..."      │    Medium               │
+│                     │                     │  • Fear & Greed: 65     │
+│                     │  [Rebalance Now]    │    (Greed)              │
+│                     │                     │                         │
+├─────────────────────┴─────────────────────┼─────────────────────────┤
+│                                           │                         │
+│  RECENT ACTIVITY                          │  ACHIEVEMENT PROGRESS   │
+│                                           │                         │
+│  • Portfolio rebalanced (-2% BTC, +2% ETH)│  ■■■■■□□□□□ 40%         │
+│    2 hours ago                            │  "Diversification Pro"  │
+│  • Yield farming position opened          │                         │
+│    Yesterday at 2:15 PM                   │  ■■■□□□□□□□ 20%         │
+│  • $500 Deposited to portfolio            │  "Yield Hunter"         │
+│    2 days ago                             │                         │
+│                                           │  [View All]             │
+│  [View All]                               │                         │
+│                                           │                         │
+├───────────────────────────────────────────┼─────────────────────────┤
+│                                           │                         │
+│  QUICK ACTIONS                            │  SOCIAL INSIGHTS        │
+│                                           │                         │
+│  [Deposit] [Withdraw] [Chat with AI]      │  • Top strategy this    │
+│  [Simulate] [Optimize Yield]              │    week: "High Yield    │
+│                                           │    Stables" +15% MoM    │
+│                                           │  • 3 friends started    │
+│                                           │    using a new strategy │
+│                                           │                         │
+└───────────────────────────────────────────┴─────────────────────────┘

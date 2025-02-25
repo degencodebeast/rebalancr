@@ -1,0 +1,104 @@
+rebalancr/frontend/
+├── public/                      # Static files
+│   ├── assets/
+│   │   ├── icons/               # SVG and PNG icons
+│   │   ├── images/              # Images for landing page and UI
+│   │   └── animations/          # Lottie files and animations
+│   └── favicon.ico
+├── src/                         # Source code
+│   ├── app/                     # App Router (Next.js 13+)
+│   │   ├── page.tsx             # Landing page (/)
+│   │   ├── layout.tsx           # Root layout
+│   │   ├── features/            # Feature detail pages
+│   │   │   ├── [feature]/
+│   │   │   │   └── page.tsx
+│   │   ├── auth/                # Auth pages
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   └── register/
+│   │   │       └── page.tsx
+│   │   ├── dashboard/           # Dashboard page
+│   │   │   └── page.tsx
+│   │   ├── portfolio/           # Portfolio pages
+│   │   │   └── page.tsx
+│   │   ├── chat/                # Chat page
+│   │   │   └── page.tsx
+│   │   ├── simulator/           # Simulator page
+│   │   │   └── page.tsx
+│   │   ├── achievements/        # Achievements page
+│   │   │   └── page.tsx
+│   │   └── social/              # Social trading page
+│   │       └── page.tsx
+│   ├── components/              # React components
+│   │   ├── landing/             # Landing page components
+│   │   │   ├── HeroSection.tsx
+│   │   │   ├── FeatureBoxes.tsx
+│   │   │   └── ...
+│   │   ├── auth/                # Auth components
+│   │   │   ├── LoginForm.tsx
+│   │   │   └── RegisterForm.tsx
+│   │   ├── dashboard/           # Dashboard components
+│   │   │   ├── SummaryCard.tsx
+│   │   │   └── ...
+│   │   ├── portfolio/           # Portfolio components
+│   │   │   ├── AssetAllocation.tsx
+│   │   │   └── ...
+│   │   ├── chat/                # Chat components
+│   │   │   ├── MessageBubble.tsx
+│   │   │   └── ...
+│   │   ├── simulator/           # Simulator components
+│   │   ├── achievements/        # Achievement components
+│   │   ├── social/              # Social components
+│   │   ├── common/              # Common UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Card.tsx
+│   │   │   └── ...
+│   │   ├── layout/              # Layout components
+│   │   │   ├── Header.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── ...
+│   │   └── charts/              # Data visualization 
+│   │       ├── AssetAllocationChart.tsx
+│   │       └── ...
+│   ├── contexts/                # React contexts
+│   │   ├── AuthContext.tsx      # Authentication state
+│   │   ├── PortfolioContext.tsx # Portfolio data
+│   │   ├── WebSocketContext.tsx # WebSocket connections
+│   │   └── WalletContext.tsx    # Wallet connection state
+│   ├── services/                # API and service integrations
+│   │   ├── api/                 # API clients
+│   │   │   ├── client.ts        # Base client configuration
+│   │   │   ├── portfolio.ts     # Portfolio-related API calls
+│   │   │   └── ...
+│   │   ├── websocket/           # WebSocket services
+│   │   │   ├── client.ts        # WebSocket client
+│   │   │   └── ...
+│   │   └── wallet/              # Wallet services
+│   │       ├── agentkit.ts      # AgentKit integration
+│   │       └── ...
+│   ├── hooks/                   # Custom React hooks
+│   │   ├── usePortfolio.ts      # Portfolio data hook
+│   │   ├── useChat.ts           # Chat functionality hook
+│   │   └── ...
+│   ├── types/                   # TypeScript types
+│   │   ├── portfolio.ts         # Portfolio-related types
+│   │   ├── user.ts              # User-related types
+│   │   └── ...
+│   ├── utils/                   # Utility functions
+│   │   ├── formatters.ts        # Data formatting utilities
+│   │   ├── calculations.ts      # Financial calculations
+│   │   └── ...
+│   ├── styles/                  # Global styles
+│   │   ├── globals.css          # Global CSS
+│   │   └── theme.ts             # Theme configuration
+│   ├── lib/                     # Shared libraries
+│   │   └── ...
+│   └── middleware.ts            # Next.js middleware
+├── .env                         # Environment variables
+├── .env.development             # Development variables
+├── .env.production              # Production variables
+├── next.config.js               # Next.js configuration
+├── tailwind.config.js           # Tailwind CSS config (if using)
+├── package.json                 # Dependencies and scripts
+├── tsconfig.json                # TypeScript configuration
+└── README.md                    # Project documentation

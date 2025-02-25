@@ -1,0 +1,102 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│  HEADER: Logo | Features | How It Works | About | Sign In | Sign Up │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  HERO SECTION                                                       │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│                                                                     │
+│  AI-Powered Portfolio Rebalancing                                   │
+│  for the Modern DeFi Investor                                       │
+│                                                                     │
+│  Optimize your crypto portfolio with intelligent rebalancing,       │
+│  yield strategies, and cross-chain execution - all powered by AI.   │
+│                                                                     │
+│  [Get Started] [See Demo]                                           │
+│                                                                     │
+│  [Screenshot/Animation of dashboard with portfolio view]            │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  KEY FEATURES                                                       │
+│  ━━━━━━━━━━━━━━━                                                    │
+│                                                                     │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
+│  │ AI Assistant  │  │ Smart         │  │ Cross-Chain   │           │
+│  │               │  │ Rebalancing   │  │ Execution     │           │
+│  │ [Icon]        │  │ [Icon]        │  │ [Icon]        │           │
+│  │               │  │               │  │               │           │
+│  │ Chat with our │  │ Automatically │  │ Seamlessly    │           │
+│  │ AI to analyze │  │ optimize your │  │ execute trades│           │
+│  │ your portfolio│  │ portfolio for │  │ across chains │           │
+│  │ and get smart │  │ maximum risk- │  │ with Wormhole │           │
+│  │ suggestions   │  │ adjusted yield│  │ integration   │           │
+│  └───────────────┘  └───────────────┘  └───────────────┘           │
+│                                                                     │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
+│  │ Yield         │  │ Real-Time     │  │ Social        │           │
+│  │ Optimization  │  │ Analytics     │  │ Trading       │           │
+│  │ [Icon]        │  │ [Icon]        │  │ [Icon]        │           │
+│  │               │  │               │  │               │           │
+│  │ Automatically │  │ Track your    │  │ Learn from    │           │
+│  │ find the best │  │ performance   │  │ top traders   │           │
+│  │ yield for your│  │ with advanced │  │ and share your│           │
+│  │ assets across │  │ dashboards    │  │ strategies    │           │
+│  │ DeFi          │  │ and metrics   │  │ with friends  │           │
+│  └───────────────┘  └───────────────┘  └───────────────┘           │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  HOW IT WORKS                                                       │
+│  ━━━━━━━━━━━━━                                                      │
+│                                                                     │
+│  1. Connect your wallet                                             │
+│  2. Set your risk tolerance and investment goals                    │
+│  3. Let our AI analyze your portfolio                               │
+│  4. Receive personalized optimization suggestions                   │
+│  5. Execute trades with a single click                              │
+│                                                                     │
+│  [Animated flow diagram showing these steps]                        │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  TECHNOLOGY                                                         │
+│  ━━━━━━━━━━━━                                                       │
+│                                                                     │
+│  Powered by                                                         │
+│  [Coinbase AgentKit logo] [Curvance logo] [Allora logo]            │
+│  [Wormhole logo] [Claude AI logo]                                   │
+│                                                                     │
+│  Rebalancr combines cutting-edge technologies to deliver a          │
+│  seamless experience:                                               │
+│                                                                     │
+│  • AgentKit for secure wallet integration                           │
+│  • Claude AI for intelligent portfolio analysis                     │
+│  • Curvance for optimized yield strategies                          │
+│  • Allora for market predictions                                    │
+│  • Wormhole for cross-chain execution                               │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  TESTIMONIALS                                                       │
+│  ━━━━━━━━━━━━━━                                                     │
+│                                                                     │
+│  "Rebalancr has transformed how I manage my crypto portfolio.       │
+│   The AI suggestions have increased my returns by 15%."             │
+│   - Alex K., Early User                                             │
+│                                                                     │
+│  [Additional testimonial quotes with user photos]                   │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  GET STARTED                                                        │
+│  ━━━━━━━━━━━━                                                       │
+│                                                                     │
+│  Ready to optimize your crypto portfolio?                           │
+│                                                                     │
+│  [Create Free Account]     [Schedule Demo]                          │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  FOOTER: About | Privacy | Terms | Contact | © 2023 Rebalancr       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
