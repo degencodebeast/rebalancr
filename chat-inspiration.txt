@@ -1,0 +1,40 @@
+┌─────────────────────────────────────────────────────────────────────────┐
+│  AI ASSISTANT                                                  [Expand] │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                                                                 │   │
+│  │  AI > How can I help with your portfolio today?                 │   │
+│  │                                                                 │   │
+│  │  YOU > Show me my portfolio                                     │   │
+│  │                                                                 │   │
+│  │  AI > Here's your current portfolio:                           │   │
+│  │       ┌─────────┬───────────┬──────────┬───────┬───────────┐   │   │
+│  │       │ Asset   │ Strategy  │ Position │ APY   │ 24h Chg   │   │   │
+│  │       ├─────────┼───────────┼──────────┼───────┼───────────┤   │   │
+│  │       │ ETH     │ Morpho    │ 3.5 ETH  │ 8.22% │ +2.1%     │   │   │
+│  │       │ USDC    │ Aave      │ 5,000    │ 5.03% │ 0.0%      │   │   │
+│  │       │ BTC     │ Lido      │ 0.2 BTC  │ 6.30% │ -1.2%     │   │   │
+│  │       └─────────┴───────────┴──────────┴───────┴───────────┘   │   │
+│  │                                                                 │   │
+│  │       Total value: $43,560 (+1.3% today)                       │   │
+│  │       [View Details] [Performance History]                     │   │
+│  │                                                                 │   │
+│  │  YOU > How is my performance?                                   │   │
+│  │                                                                 │   │
+│  │  AI > Your portfolio is up 1.3% today ($560):                  │   │
+│  │       • ETH positions: +2.1% ($540)                            │   │
+│  │       • BTC positions: -1.2% ($120)                            │   │
+│  │       • Stablecoins: unchanged                                 │   │
+│  │                                                                 │   │
+│  │       Your highest yield is from Morpho at 8.22% APY.          │   │
+│  │       [View Performance Chart] [Rebalance Now]                 │   │
+│  │                                                                 │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Ask Rebalancr AI...                                   [Send >]  │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  [Optimize Yield]  [Market Analysis]  [Show Portfolio]                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
