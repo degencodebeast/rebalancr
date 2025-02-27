@@ -1,4 +1,4 @@
-from coinbase_agentkit.tools import create_intent
+from coinbase_agentkit import create_intent
 
 # Custom intents for financial actions
 deposit_to_curvance = create_intent(
