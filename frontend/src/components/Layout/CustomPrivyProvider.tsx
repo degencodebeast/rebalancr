@@ -17,6 +17,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         embeddedWallets: {
           createOnLogin: 'users-without-wallets',
         },
+        // Configure login behavior
+        loginMethods: ['wallet', 'email'],
+        // This allows you to handle the signature manually if needed
+        signInOptions: {
+          skipAuthOnRedirect: true,
+        },
       }}
     >
       {children}
