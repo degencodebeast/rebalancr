@@ -7,7 +7,6 @@ __pycache__/
 # Specific environment files
 frontend/.env
 backend/.env
-rebalancr/frontend/.env
-rebalancr/backend/.env
+
 
 # Add other exclusions as needed... 
