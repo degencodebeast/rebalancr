@@ -1,0 +1,147 @@
+// Chat input styling
+.chat-input {
+  .mantine-Textarea-wrapper {
+    .mantine-Textarea-input {
+      background-color: #121212;
+      border-radius: 40px;
+      padding: 16px;
+      color: white;
+      border: none;
+      font-size: 16px;
+      max-height: 250px;
+      overflow-y: auto;
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      &:focus {
+        border: 1px solid #8c52ff;
+      }
+    }
+  }
+
+  .mantine-Textarea-section {
+    right: 4%;
+    align-self: flex-end;
+    margin-bottom: 8px;
+
+    button {
+      border-radius: 40px;
+      margin-right: 4px;
+      background-color: #8c52ff;
+      font-size: 16px;
+      font-weight: 500;
+    }
+  }
+}
+
+.mantine-Textarea-input {
+  &.chat-input {
+    color: white;
+  }
+}
+
+// Chat styling for WhatsApp-like layout
+.chat-container {
+  .message-row {
+    display: flex;
+    margin-bottom: 16px;
+    align-items: flex-end;
+
+    &.user-message {
+      flex-direction: row-reverse;
+    }
+  }
+
+  .avatar-container {
+    flex-shrink: 0;
+    margin: 0 8px;
+  }
+
+  .message-bubble {
+    max-width: 70%;
+    border-radius: 12px;
+    position: relative;
+    border: none;
+    color: white;
+
+    &.assistant-bubble {
+      background-color: rgb(18, 18, 18, 0.8);
+      border-bottom-left-radius: 0;
+    }
+
+    &.user-bubble {
+      background-color: #8c52ff;
+      border-bottom-right-radius: 0;
+    }
+  }
+
+  .chat-input {
+    .mantine-Textarea-wrapper {
+      .mantine-Textarea-input {
+        background-color: #121212;
+        border-radius: 40px;
+        padding: 8px 16px;
+        color: white;
+        border: none;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        &:focus {
+          border-color: #8c52ff;
+        }
+      }
+    }
+
+    .mantine-Textarea-section {
+      right: 4px;
+    }
+  }
+}
+
+@media screen and (max-width: 1200px) {
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 7%;
+    }
+  }
+}
+
+@media screen and (max-width: 800px) {
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 6%;
+    }
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .chat-container {
+    .message-bubble {
+      max-width: 80%;
+    }
+  }
+
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 11%;
+    }
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .chat-container {
+    .message-bubble {
+      max-width: 80%;
+    }
+  }
+
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 12%;
+    }
+  }
+}
