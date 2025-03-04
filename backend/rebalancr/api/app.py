@@ -89,7 +89,7 @@ intelligence_engine = IntelligenceEngine(
     config=config
 )
 
-# # Now initialize strategy engine with all components
+# Now initialize strategy engine with all components
 # strategy_engine = StrategyEngine(
 #     intelligence_engine=intelligence_engine,
 #     risk_manager=risk_manager,
@@ -164,7 +164,7 @@ async def monitor_portfolios():
             await asyncio.sleep(300)  # Wait and retry
 
 # WebSocket endpoint
-@app.websocket("/ws/{user_id}")
+#@app.websocket("/ws/{user_id}")
 # async def websocket_endpoint(websocket: WebSocket, user_id: str):
 #     """WebSocket endpoint for chat communication"""
 #     await connection_manager.connect(websocket, user_id)
@@ -238,9 +238,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 if "agent" in chunk:
                     response = chunk["agent"]["messages"][0].content
                     await websocket.send_text(response)
+                    #await websocket.send_json(response)
                 elif "tools" in chunk:
                     response = chunk["tools"]["messages"][0].content
                     await websocket.send_text(response)
+                    #await websocket.send_json(response)
     except WebSocketDisconnect:
     #      logger.info(f"Client disconnected: {user_id}")
     #     connection_manager.disconnect(websocket, user_id)
