@@ -1,13 +1,13 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { useLogin, usePrivy } from '@privy-io/react-auth'
+import { useLogin, usePrivy, User } from '@privy-io/react-auth'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 export default function Home() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const { authenticated, ready, logout } = usePrivy()
 
   // Check if user is already authenticated and redirect
