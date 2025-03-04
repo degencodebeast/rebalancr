@@ -1,28 +1,30 @@
 'use client'
 
 import { PrivyProvider } from '@privy-io/react-auth'
+import { monadTestnet } from 'viem/chains'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       config={{
-        // Customize Privy's appearance in your app
         appearance: {
           theme: 'light',
           accentColor: '#676FFF',
           logo: 'https://your-logo-url',
+          walletList: [
+            'phantom',
+            'metamask',
+            'coinbase_wallet',
+            'rabby_wallet',
+            'rainbow',
+            'wallet_connect',
+            'backpack',
+          ],
         },
-        // Create embedded wallets for users who don't have a wallet
-        embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-        },
-        // Configure login behavior
-        loginMethods: ['wallet', 'email'],
-        // This allows you to handle the signature manually if needed
-        signInOptions: {
-          skipAuthOnRedirect: true,
-        },
+
+        defaultChain: monadTestnet,
+        supportedChains: [monadTestnet],
       }}
     >
       {children}

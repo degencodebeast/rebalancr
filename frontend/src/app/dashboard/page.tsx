@@ -3,16 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
 import { usePrivy } from '@privy-io/react-auth'
-import {
-  Button,
-  TextInput,
-  Paper,
-  ScrollArea,
-  Avatar,
-  Text,
-  Group,
-} from '@mantine/core'
+import { Textarea, Paper, ScrollArea, Avatar, Text } from '@mantine/core'
 import SendIcon from '@/components/icons/SendIcon'
+import '@/app/dashboard/chats.scss'
+import { Button } from '@/components/ui/button'
+import { blo } from 'blo'
 
 // Message type definition
 interface Message {
@@ -29,6 +24,7 @@ export default function Dashboard() {
   const [wsConnected, setWsConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const welcomeMessageShownRef = useRef(false)
 
   // Connect to WebSocket
   useEffect(() => {
@@ -50,7 +46,9 @@ export default function Dashboard() {
       // Handle different message types
       if (data.type === 'chat_message') {
         addMessage({
-          id: Date.now().toString(),
+          id: `assistant-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`,
           sender: 'assistant',
           content: data.content,
           timestamp: new Date(),
@@ -67,21 +65,54 @@ export default function Dashboard() {
       console.error('WebSocket error:', error)
     }
 
-    // Add welcome message
-    setTimeout(() => {
-      addMessage({
-        id: 'welcome',
-        sender: 'assistant',
-        content:
-          'Welcome to Rebalancr! How can I help you with your portfolio today?',
-        timestamp: new Date(),
-      })
-    }, 1000)
-
     return () => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.close()
       }
+    }
+  }, [])
+
+  // Create a separate useEffect for the welcome message
+  // useEffect(() => {
+  //   //Add welcome message only once
+  //   if (!welcomeMessageShownRef.current && messages.length === 0) {
+  //     setTimeout(() => {
+  //       addMessage({
+  //         id: `welcome-${Date.now()}-${Math.random()
+  //           .toString(36)
+  //           .substring(2, 9)}`,
+  //         sender: 'assistant',
+  //         content:
+  //           'Hi Anon, you are about to start chatting with rebalancr. An AI automated portfolio management system predicting optimal assets allocation to ensure maximum profits and to cut loses.',
+  //         timestamp: new Date(),
+  //       })
+  //       welcomeMessageShownRef.current = true
+  //     }, 1000)
+  //   }
+  // }, [])
+
+  useEffect(() => {
+    if (!welcomeMessageShownRef.current) {
+      setTimeout(() => {
+        setMessages((prev) => {
+          if (prev.length === 0) {
+            welcomeMessageShownRef.current = true
+            return [
+              ...prev,
+              {
+                id: `welcome-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substring(2, 9)}`,
+                sender: 'assistant',
+                content:
+                  'Hi Anon, you are about to start chatting with rebalancr. An AI automated portfolio management system predicting optimal assets allocation to ensure maximum profits and to cut loses.',
+                timestamp: new Date(),
+              },
+            ]
+          }
+          return prev
+        })
+      }, 1000)
     }
   }, [])
 
@@ -134,85 +165,76 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-80px)]">
-        <div className="p-4 border-b">
-          <h1 className="text-2xl font-bold">Chat with Rebalancr</h1>
-          <div className="flex items-center mt-2">
-            <div
-              className={`w-3 h-3 rounded-full mr-2 ${
-                wsConnected ? 'bg-green-500' : 'bg-red-500'
-              }`}
-            ></div>
-            <span className="text-sm text-gray-600">
-              {wsConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-        </div>
-
+      <div className="flex flex-col h-[calc(100vh-80px)] bg-[#3f3f3f]">
         {/* Chat messages area */}
-        <ScrollArea className="flex-grow p-4" viewportRef={viewportRef}>
+        <ScrollArea
+          className="flex-grow px-2 py-4 md:px-4 chat-container"
+          viewportRef={viewportRef}
+        >
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`mb-4 flex ${
-                message.sender === 'user' ? 'justify-end' : 'justify-start'
+              className={`message-row ${
+                message.sender === 'user' ? 'user-message' : 'assistant-message'
               }`}
             >
+              <div className="avatar-container">
+                {message.sender === 'assistant' ? (
+                  <Avatar size={32} color="white" radius="xl" bg="#121212">
+                    AI
+                  </Avatar>
+                ) : (
+                  <Avatar
+                    size={32}
+                    radius="xl"
+                    bg="#8c52ff"
+                    color="white"
+                    src={blo(`0x${user?.wallet?.address}`)}
+                  >
+                    {user?.wallet?.address?.substring(0, 2) || 'U'}
+                  </Avatar>
+                )}
+              </div>
+
               <Paper
                 p="md"
                 withBorder
-                className={`max-w-[80%] ${
-                  message.sender === 'user'
-                    ? 'bg-blue-50 border-blue-200'
-                    : 'bg-gray-50 border-gray-200'
+                className={`message-bubble ${
+                  message.sender === 'user' ? 'user-bubble' : 'assistant-bubble'
                 }`}
+                style={{
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
               >
-                <Group align="flex-start" mb={5}>
-                  {message.sender === 'assistant' && (
-                    <Avatar color="blue" radius="xl">
-                      AI
-                    </Avatar>
-                  )}
-                  <div>
-                    <Text size="sm" c="dimmed">
-                      {message.sender === 'user'
-                        ? 'You'
-                        : 'Rebalancr Assistant'}
-                    </Text>
-                    <Text>{message.content}</Text>
-                  </div>
-                  {message.sender === 'user' && (
-                    <Avatar color="indigo" radius="xl">
-                      {user?.wallet?.address?.substring(0, 2) || 'U'}
-                    </Avatar>
-                  )}
-                </Group>
+                <Text c={'#fff'}>{message.content}</Text>
               </Paper>
             </div>
           ))}
         </ScrollArea>
 
         {/* Input area */}
-        <div className="p-4 border-t">
-          <div className="flex">
-            <TextInput
-              className="flex-grow"
-              placeholder="Type your message here..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              rightSection={
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!wsConnected || !inputMessage.trim()}
-                  variant="subtle"
-                  color="blue"
-                >
-                  <SendIcon />
-                </Button>
-              }
-            />
-          </div>
+        <div className="px-4 pb-6">
+          <Textarea
+            className="flex-grow chat-input"
+            placeholder="Type your prompt here..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={handleKeyPress}
+            autosize
+            maxRows={8}
+            minRows={1}
+            rightSection={
+              <Button
+                onClick={handleSendMessage}
+                disabled={!wsConnected || !inputMessage.trim()}
+                variant="default"
+                className="flex items-center gap-2"
+              >
+                <span>Send</span>
+                <SendIcon />
+              </Button>
+            }
+          />
         </div>
       </div>
     </DashboardLayout>

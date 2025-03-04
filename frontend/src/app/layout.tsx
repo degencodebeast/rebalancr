@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Bricolage_Grotesque } from 'next/font/google'
-import './globals.css'
+import './globals.scss'
 import '@mantine/core/styles.css'
 import CustomPrivyProvider from '@/components/Layout/CustomPrivyProvider'
 import CustomReduxProvider from '@/components/Layout/CustomReduxProvider'
