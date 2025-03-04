@@ -1,18 +1,40 @@
-from coinbase_agentkit import AgentKit
+from coinbase_agentkit import AgentKit, AgentKitConfig, CdpWalletProvider, CdpWalletProviderConfig
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional, TYPE_CHECKING
+import aiohttp
+import logging
 
-from ..intelligence_engine import IntelligenceEngine
+from rebalancr.config import Settings
+
+# Use conditional import to avoid circular imports
+if TYPE_CHECKING:
+    from ..intelligence_engine import IntelligenceEngine
+
+logger = logging.getLogger(__name__)
+
 from ..allora.client import AlloraClient
 from ..market_analysis import MarketAnalyzer
 
 class AgentKitClient:
-    def __init__(self, config):
-        self.agent_kit = AgentKit(
-            agent_id=config.AGENT_ID,
-            api_key=config.API_KEY,
-            api_secret=config.API_SECRET
+    def __init__(self, config: Settings, intelligence_engine=None):
+        # First create a wallet provider config
+        wallet_provider_config = CdpWalletProviderConfig(
+            api_key_name=config.CDP_API_KEY_NAME,
+            api_key_private_key=config.CDP_API_KEY_PRIVATE_KEY
         )
+        
+        # Create the wallet provider
+        self.wallet_provider = CdpWalletProvider(wallet_provider_config)
+        
+        # Create the AgentKit config
+        agent_kit_config = AgentKitConfig(
+            wallet_provider=self.wallet_provider,
+            # Add other required parameters here
+        )
+        
+        # Initialize AgentKit with the proper config
+        self.agent_kit = AgentKit(agent_kit_config)
+        
         self.conversations = {}  # Store active conversations
         
         # Initialize Allora client
@@ -22,11 +44,12 @@ class AgentKitClient:
         self.market_analyzer = MarketAnalyzer()
         
         # Initialize intelligence engine
-        self.intelligence_engine = IntelligenceEngine(
-            allora_client=self.allora_client,
-            market_analyzer=self.market_analyzer,
-            config=config
-        )
+        self.intelligence_engine = intelligence_engine
+        self.base_url = "https://api.example.com/agentkit"  # Replace with actual URL
+        
+    def set_intelligence_engine(self, intelligence_engine):
+        """Set the intelligence engine after initialization"""
+        self.intelligence_engine = intelligence_engine
         
     async def initialize_session(self, user_id):
         """Initialize a new conversation for a user"""
@@ -214,3 +237,14 @@ class AgentKitClient:
             "confidence": confidence,
             "reasoning": f"Combined AI sentiment ({sentiment_score}) and statistical signals ({stats_score})"
         }
+
+    async def execute_trade(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a trade via AgentKit"""
+        # Implementation
+        logger.info(f"Executing trade with params: {params}")
+        return {"status": "success", "transaction_id": "dummy_id"}
+    
+    async def get_wallet_info(self, address: str) -> Dict[str, Any]:
+        """Get wallet information"""
+        # Implementation
+        return {"address": address, "balance": 1000}

@@ -1,6 +1,8 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks
 import logging
 import asyncio
+from fastapi.middleware.cors import CORSMiddleware
+from rebalancr.execution.action_registry import ActionRegistry
 
 from ..database.db_manager import DatabaseManager
 from ..intelligence.agent_kit.wallet_provider import get_wallet_provider
@@ -9,8 +11,7 @@ from ..intelligence.allora.client import AlloraClient
 from ..chat.history_manager import ChatHistoryManager
 from .websocket import connection_manager
 from ..websockets.chat_handler import ChatWebSocketHandler
-from ..config import Config
-from ..intelligence.market_data import MarketDataService
+from ..services.market import MarketDataService
 from ..strategy.risk_manager import RiskManager
 from ..strategy.yield_optimizer import YieldOptimizer
 from ..strategy.wormhole import WormholeService
@@ -21,16 +22,32 @@ from ..intelligence.agent_kit.client import AgentKitClient
 from ..services.chat import ChatService
 from coinbase_agentkit import AgentKit, AgentKitConfig
 from ..intelligence.agent_kit.trade_agent import TradeAgent
+from .routes import auth, chat_routes, websocket_routes
+from ..config import get_settings
+from rebalancr.intelligence.agent_kit.service import AgentKitService
+from rebalancr.config import Settings
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load configuration
-config = Config()
+config = get_settings()
 
 # Initialize application
 app = FastAPI(title="Rebalancr API")
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize database
 db_manager = DatabaseManager(config.DATABASE_URL)
@@ -40,25 +57,28 @@ allora_client = AlloraClient(api_key=config.ALLORA_API_KEY)
 
 # Initialize market analyzer and agent kit client
 market_analyzer = MarketAnalyzer()
-agent_kit_client = AgentKitClient(config)
+agent_kit_client = AgentKitClient(config) #This one is initializing with the cdp wallet provider
 
-# Initialize wallet provider
-#wallet_provider = get_wallet_provider(config)
-wallet_provider = get_wallet_provider()
+wallet_provider = agent_kit_client.wallet_provider
+#Initialize wallet provider
+#
+# wallet_provider = get_wallet_provider(config)
+# wallet_provider = get_wallet_provider()
 
-# Initialize AgentKit with the Privy wallet provider
-agentkit = AgentKit(AgentKitConfig(
-    wallet_provider=wallet_provider,
-    action_providers=[
-        # Your action providers here
-    ]
-))
+# # Initialize AgentKit with the Privy wallet provider
+# agentkit = AgentKit(AgentKitConfig(
+#     wallet_provider=wallet_provider,
+#     action_providers=[
+#         # Your action providers here
+#     ]
+# ))
 
 # Initialize missing components
 market_data_service = MarketDataService(config)
-risk_manager = RiskManager(config)
-yield_optimizer = YieldOptimizer(config)
+risk_manager = RiskManager(db_manager, config)
+yield_optimizer = YieldOptimizer(db_manager, market_data_service, config)
 wormhole_service = WormholeService(config)
+agent_service = AgentKitService.get_instance(config)
 
 # Initialize intelligence engine
 intelligence_engine = IntelligenceEngine(
@@ -69,15 +89,17 @@ intelligence_engine = IntelligenceEngine(
     config=config
 )
 
-# Now initialize strategy engine with all components
-strategy_engine = StrategyEngine(
-    intelligence_engine=intelligence_engine,
-    risk_manager=risk_manager,
-    yield_optimizer=yield_optimizer,
-    wormhole_service=wormhole_service,
-    db_manager=db_manager,
-    config=config
-)
+# # Now initialize strategy engine with all components
+# strategy_engine = StrategyEngine(
+#     intelligence_engine=intelligence_engine,
+#     risk_manager=risk_manager,
+#     yield_optimizer=yield_optimizer,
+#     wormhole_service=wormhole_service,
+#     db_manager=db_manager,
+#     config=config
+# )
+
+strategy_engine = StrategyEngine()
 
 
 # Initialize agent
@@ -89,8 +111,9 @@ strategy_engine = StrategyEngine(
 #         "wallet_data_file": "wallet_data.json"
 #     }
 # )
-trade_agent = TradeAgent(db_manager, market_analyzer, wallet_provider)
-portfolio_agent = PortfolioAgent(allora_client, db_manager, strategy_engine, trade_agent)
+trade_agent = TradeAgent(db_manager, market_analyzer, agent_service)
+action_registry = ActionRegistry()
+portfolio_agent = PortfolioAgent(allora_client, db_manager, strategy_engine, config, action_registry)
 
 # Initialize chat history manager
 chat_history_manager = ChatHistoryManager(db_manager=db_manager)
@@ -142,49 +165,89 @@ async def monitor_portfolios():
 
 # WebSocket endpoint
 @app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for chat communication"""
-    await connection_manager.connect(websocket, user_id)
+# async def websocket_endpoint(websocket: WebSocket, user_id: str):
+#     """WebSocket endpoint for chat communication"""
+#     await connection_manager.connect(websocket, user_id)
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    # Load configuration (from .env and elsewhere)
+    settings = Settings()
+    # Get the centralized AgentKit service instance
+    service = AgentKitService.get_instance(settings)
+
+    #  try:
+    #     # Send welcome message
+    #     await connection_manager.send_personal_message(
+    #         {
+    #             "type": "system_message",
+    #             "message": "Connected to Rebalancr chat service"
+    #         },
+    #         user_id
+    #     )
+        
+    #     # Process messages
+    
+    # Create a new ReAct agent for this connection
+    memory = MemorySaver()
+    config = {"configurable": {"thread_id": "CDP Agentkit Chatbot Example!"}}
+    
+    agent_executor = create_react_agent(
+        service.llm,
+        tools=service.tools,
+        checkpointer=memory,
+        state_modifier=(
+            "You are a helpful financial agent that can perform on-chain transactions "
+            "like depositing funds and rebalancing portfolios. Before executing actions, "
+            "verify wallet details and explain your steps. If a 5XX error occurs, ask the user "
+            "to try again later."
+        ),
+    )
     
     try:
-        # Send welcome message
-        await connection_manager.send_personal_message(
-            {
-                "type": "system_message",
-                "message": "Connected to Rebalancr chat service"
-            },
-            user_id
-        )
-        
-        # Process messages
         while True:
-            data = await websocket.receive_json()
+            #   data = await websocket.receive_json()
             
-            if data.get("type") == "chat_message":
-                message = data.get("message", "")
-                conversation_id = data.get("conversation_id")
+            # if data.get("type") == "chat_message":
+            #     message = data.get("message", "")
+            #     conversation_id = data.get("conversation_id")
                 
-                if message:
-                    # Process through the chat service
-                    async for response_chunk in chat_service.process_message(
-                        user_id, message, conversation_id
-                    ):
-                        # Send each chunk as it becomes available
-                        await connection_manager.send_personal_message(
-                            {
-                                "type": response_chunk["type"],
-                                "message": response_chunk["content"],
-                                "conversation_id": response_chunk["conversation_id"]
-                            },
-                            user_id
-                        )
+            #     if message:
+            #         # Process through the chat service
+            #         async for response_chunk in chat_service.process_message(
+            #             user_id, message, conversation_id
+            #         ):
+            #             # Send each chunk as it becomes available
+            #             await connection_manager.send_personal_message(
+            #                 {
+            #                     "type": response_chunk["type"],
+            #                     "message": response_chunk["content"],
+            #                     "conversation_id": response_chunk["conversation_id"]
+            #                 },
+            #                 user_id
+            #             )
     
+
+            # Await message from the frontend client
+            user_message = await websocket.receive_text()
+            # Send prompt to the agent using the ReAct agent executor
+            for chunk in agent_executor.stream(
+                {"messages": [HumanMessage(content=user_message)]}, config
+            ):
+                # Stream back the agent's responses; you can refine types if needed
+                if "agent" in chunk:
+                    response = chunk["agent"]["messages"][0].content
+                    await websocket.send_text(response)
+                elif "tools" in chunk:
+                    response = chunk["tools"]["messages"][0].content
+                    await websocket.send_text(response)
     except WebSocketDisconnect:
-        logger.info(f"Client disconnected: {user_id}")
-        connection_manager.disconnect(websocket, user_id)
-    except Exception as e:
-        logger.error(f"Error in websocket: {str(e)}")
-        connection_manager.disconnect(websocket, user_id)
+    #      logger.info(f"Client disconnected: {user_id}")
+    #     connection_manager.disconnect(websocket, user_id)
+    # except Exception as e:
+    #     logger.error(f"Error in websocket: {str(e)}")
+    #     connection_manager.disconnect(websocket, user_id)
+        print("WebSocket disconnected")
 
 # At the end of your app initialization
 @app.on_event("startup")
@@ -470,6 +533,12 @@ async def startup_event():
 #     except Exception as e:
 #         logger.error(f"Error in websocket: {str(e)}")
 #         connection_manager.disconnect(websocket, user_id)
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(chat_routes.router)
+app.include_router(websocket_routes.router, tags=["websocket"])
+#app.include_router(portfolio_routes.router)
 
 @app.get("/")
 async def home():

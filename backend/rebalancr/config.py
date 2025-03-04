@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+
+    ALLORA_API_KEY: str = os.getenv("ALLORA_API_KEY")
+    AGENT_ID: str = os.getenv("AGENT_ID")
     
     # API Configuration
     API_V1_STR: str = "/api/v1"
@@ -34,10 +37,21 @@ class Settings(BaseSettings):
     # External APIs
     PRIVY_APP_ID: Optional[str] = os.getenv("PRIVY_APP_ID")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
+    PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")
+
+    CDP_API_KEY_NAME: Optional[str] = os.getenv("CDP_API_KEY_NAME")
+    CDP_API_KEY_PRIVATE_KEY: Optional[str] = os.getenv("CDP_API_KEY_PRIVATE_KEY")
+    
+    # # Add this field to your existing Settings class
+    # PRIVY_WALLET_ID: Optional[str] = None
     
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Alternative solution: ignore extra fields
 
 # Initialize settings once
 settings = Settings()
+
+def get_settings():
+    return Settings()

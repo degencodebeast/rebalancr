@@ -4,6 +4,7 @@ import base64
 import requests
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
+from abc import ABC, abstractmethod
 
 # Load environment variables
 load_dotenv()
@@ -16,16 +17,43 @@ PRIVY_WALLET_ID = os.getenv("PRIVY_WALLET_ID")  # Optional, will create a new wa
 # Configure a file to persist the wallet data
 WALLET_DATA_FILE = "privy_wallet_data.json"
 
-class PrivyWalletProvider:
+# Add the WalletProvider interface
+class WalletProvider(ABC):
+    """Abstract base class for wallet providers"""
+    
+    @abstractmethod
+    async def get_wallet_address(self, user_id: str) -> Optional[str]:
+        """Get the wallet address for a user"""
+        pass
+    
+    @abstractmethod
+    async def sign_transaction(self, user_id: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Sign a transaction using the user's wallet"""
+        pass
+    
+    @abstractmethod
+    async def send_transaction(self, user_id: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Send a signed transaction to the blockchain"""
+        pass
+    
+    @abstractmethod
+    async def get_balance(self, user_id: str, token_address: Optional[str] = None) -> Dict[str, Any]:
+        """Get the balance of the user's wallet"""
+        pass
+
+# Modify PrivyWalletProvider to implement WalletProvider
+class PrivyWalletProvider(WalletProvider):
     """
     Custom wallet provider that uses Privy Server Wallets
     for integration with AgentKit.
     """
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, db_manager=None):
         self.config = config or {}
-        self.wallet_id = self.config.get('wallet_id') or PRIVY_WALLET_ID
+        #self.wallet_id = self.config.get('wallet_id') or PRIVY_WALLET_ID or None
+        self.wallet_id = None
         self.app_id = self.config.get('app_id') or PRIVY_APP_ID
         self.app_secret = self.config.get('app_secret') or PRIVY_APP_SECRET
+        self.db_manager = db_manager
         
         # Validate required credentials
         if not self.app_id or not self.app_secret:
@@ -130,13 +158,104 @@ class PrivyWalletProvider:
         
         return WalletData(exported_data)
     
-    def get_address(self):
-        """Get wallet address"""
+    # Implement WalletProvider interface methods
+    async def get_wallet_address(self, user_id: str) -> Optional[str]:
+        """Get wallet address for a user"""
+        if self.db_manager:
+            # Try to get user-specific wallet from the database
+            user_wallet = await self.db_manager.get_agent_wallet(user_id)
+            if user_wallet and user_wallet.get("wallet_id"):
+                # Fetch up-to-date wallet info from Privy
+                self._fetch_wallet_by_id(user_wallet.get("wallet_id"))
+                return self.wallet_data.get("address")
+        
+        # Fallback to the default wallet if no user-specific wallet
         return self.wallet_data.get("address")
     
-    def get_network_id(self):
-        """Get network ID"""
-        return "base-sepolia"  # Default to base-sepolia for CDP
+    async def sign_transaction(self, user_id: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Sign a transaction using Privy API"""
+        wallet_id = await self._get_wallet_id_for_user(user_id)
+        if not wallet_id:
+            raise ValueError("No wallet found for this user")
+        
+        try:
+            url = f"https://api.privy.io/v1/wallets/{wallet_id}/sign"
+            headers = self._get_auth_headers()
+            
+            # Format transaction data according to Privy's API requirements
+            payload = {
+                "data": transaction_data
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except Exception as e:
+            print(f"Error signing transaction with Privy: {str(e)}")
+            raise
+    
+    async def send_transaction(self, user_id: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Send a transaction using Privy API"""
+        wallet_id = await self._get_wallet_id_for_user(user_id)
+        if not wallet_id:
+            raise ValueError("No wallet found for this user")
+        
+        try:
+            url = f"https://api.privy.io/v1/wallets/{wallet_id}/send"
+            headers = self._get_auth_headers()
+            
+            response = requests.post(url, headers=headers, json=transaction_data)
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except Exception as e:
+            print(f"Error sending transaction with Privy: {str(e)}")
+            raise
+    
+    async def get_balance(self, user_id: str, token_address: Optional[str] = None) -> Dict[str, Any]:
+        """Get wallet balance using blockchain provider"""
+        address = await self.get_wallet_address(user_id)
+        if not address:
+            raise ValueError("No wallet found for this user")
+        
+        # For native ETH balance
+        if not token_address:
+            try:
+                # This would need to be implemented based on your preferred blockchain provider
+                # Placeholder implementation
+                return {
+                    "balance": "1.5 ETH",
+                    "token": "ETH"
+                }
+            except Exception as e:
+                print(f"Error getting wallet balance: {str(e)}")
+                raise
+        # For ERC20 tokens
+        else:
+            try:
+                # This would need ERC20 contract interaction
+                # Placeholder implementation
+                return {
+                    "balance": "100.0",
+                    "token": token_address
+                }
+            except Exception as e:
+                print(f"Error getting token balance: {str(e)}")
+                raise
+    
+    # Helper method for user-wallet mapping
+    async def _get_wallet_id_for_user(self, user_id: str) -> Optional[str]:
+        """Get the Privy wallet ID associated with a user"""
+        if self.db_manager:
+            user_wallet = await self.db_manager.get_agent_wallet(user_id)
+            if user_wallet and user_wallet.get("wallet_id"):
+                return user_wallet.get("wallet_id")
+        
+        # Fallback to default wallet
+        return self.wallet_id
 
 
 def get_wallet_provider() -> PrivyWalletProvider:

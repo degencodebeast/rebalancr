@@ -60,6 +60,10 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return token_data.user_id
 
+# def get_current_user_id(some_parameters):
+#     # Implementation
+#     return user_id
+
 # Authentication endpoints
 @router.post("/login-with-ethereum", response_model=Token)
 async def login_with_ethereum(wallet_address: str, signature: str):

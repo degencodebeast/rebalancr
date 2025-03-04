@@ -8,7 +8,7 @@ import pandas as pd
 from .allora.client import AlloraClient
 from .market_analysis import MarketAnalyzer
 from .agent_kit.client import AgentKitClient
-from .market_data import MarketDataService
+from .market_data import MarketDataAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class IntelligenceEngine:
         allora_client: AlloraClient,
         market_analyzer: MarketAnalyzer,
         agent_kit_client: AgentKitClient,
-        market_data_service: MarketDataService,
+        market_data_service: MarketDataAnalyzer,
         config: Dict[str, Any]
     ):
         self.allora_client = allora_client
