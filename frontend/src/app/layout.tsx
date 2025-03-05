@@ -19,8 +19,8 @@ const outfit = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: 'Rebalancr',
-  description: 'Automated portfolio rebalancing',
+  title: 'Rebalancr | AI automated portfolio manager',
+  description: 'AI automated portfolio manager',
 }
 
 export default function RootLayout({

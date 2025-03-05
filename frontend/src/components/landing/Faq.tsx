@@ -40,18 +40,20 @@ const Faq = () => {
           <Accordion.Item
             key={index}
             value={`item-${index}`}
-            className="mb-6 overflow-hidden bg-[#8C52FF0D] p-5 hover:border-[#8C52FF] hover:border transition-all"
+            className="mb-6 overflow-hidden bg-[#8C52FF0D] md:p-5 px-0 hover:border-[#8C52FF] hover:border transition-all"
             styles={{
               item: {
                 borderRadius: '20px',
               },
             }}
           >
-            <Accordion.Control className="hover:bg-transparent py-6 px-8">
-              <span className="text-[24px] font-normal">{faq.question}</span>
+            <Accordion.Control className="hover:bg-transparent md:py-6 py-4 px-8">
+              <span className="md:text-[24px] text-[20px] font-normal">
+                {faq.question}
+              </span>
             </Accordion.Control>
-            <Accordion.Panel className="py-4 px-8">
-              <p className="text-[20px] font-light leading-[30px]">
+            <Accordion.Panel className="md:py-4 py-2 md:px-8 px-4">
+              <p className="md:text-[20px] text-[18px] font-light leading-[30px]">
                 {faq.answer}
               </p>
             </Accordion.Panel>
