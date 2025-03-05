@@ -19,7 +19,7 @@ export default function FlowDiagram() {
         {steps.map((step, index) => (
           <div key={step.id} className="w-full flex flex-col items-center">
             <button
-              className={`bg-[${step.color}] text-white font-normal py-10 rounded-[50px] w-full text-[24px] `}
+              className={`bg-[${step.color}] text-white font-normal md:py-10 py-6 rounded-[50px] w-full md:text-[24px] text-[19px]`}
             >
               {step.label}
             </button>
