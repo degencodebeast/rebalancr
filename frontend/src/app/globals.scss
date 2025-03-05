@@ -113,3 +113,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+.gradient-bg {
+  background-image: url('/gradient_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

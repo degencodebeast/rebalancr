@@ -84,6 +84,7 @@ export default function DashboardLayout({
         collapsed: { mobile: !opened },
       }}
       withBorder={false}
+      className="font-bricolage"
     >
       <AppShell.Header>
         <div className="flex items-center gap-6">
