@@ -1,12 +1,18 @@
-from fastapi import Depends
+from fastapi import Depends, FastAPI
 from rebalancr.intelligence.agent_kit.wallet_provider import get_wallet_provider
+import logging
 
+from rebalancr.websockets.chat_handler import ChatWebSocketHandler
+
+from ..intelligence.intelligence_engine import IntelligenceEngine
+from ..intelligence.market_analysis import MarketAnalyzer
 from ..database.db_manager import DatabaseManager
+from ..intelligence.agent_kit.service import AgentKitService
 from ..intelligence.agent_kit.chat_agent import PortfolioAgent
 from ..intelligence.agent_kit.trade_agent import TradeAgent
 from ..intelligence.allora.client import AlloraClient
 from ..strategy.engine import StrategyEngine
-from .websockets.websocket_manager import WebSocketManager
+from ..websockets.websocket_manager import WebSocketManager
 from .services.chat_service import ChatService
 from ..execution.action_registry import ActionRegistry
 from ..execution.actions.trade_actions import TradeAction, RebalanceAction
@@ -15,6 +21,17 @@ from ..agent.agent_kit import RebalancerAgentKit
 from ..config import get_settings
 from ..intelligence.agent_kit.wallet_provider import WalletProvider
 from ..execution.action_provider import TradeActionProvider
+
+# Chat and service imports
+from ..chat.history_manager import ChatHistoryManager
+from ..services.market import MarketDataService
+from ..services.chat import ChatService
+
+# Strategy imports
+from ..strategy.risk_manager import RiskManager
+from ..strategy.yield_optimizer import YieldOptimizer
+from ..strategy.wormhole import WormholeService
+
 
 # Singletons
 _db_manager = None
@@ -147,3 +164,79 @@ def get_chat_service():
         #_chat_service = ChatService(db_manager, portfolio_agent, websocket_manager)
         _chat_service = ChatService(db_manager, agent_kit, websocket_manager)
     return _chat_service 
+
+def initialize_services(app: FastAPI):
+    """Initialize all services and attach to app state"""
+    # Load configuration
+    config = get_settings()
+    
+    # Initialize database
+    db_manager = DatabaseManager(config.DATABASE_URL)
+
+    
+    # Initialize Allora client
+    allora_client = AlloraClient(api_key=config.ALLORA_API_KEY)
+    
+    # Initialize market analyzer
+    market_analyzer = MarketAnalyzer()
+    
+    # Initialize AgentKit service (singleton)
+    agent_service = AgentKitService.get_instance(config)
+
+    wallet_provider = agent_service.wallet_provider
+    
+    # Initialize missing components
+    market_data_service = MarketDataService(config)
+    risk_manager = RiskManager(db_manager, config)
+    yield_optimizer = YieldOptimizer(db_manager, market_data_service, config)
+    wormhole_service = WormholeService(config)
+    
+    # Initialize intelligence engine
+    intelligence_engine = IntelligenceEngine(
+        allora_client=allora_client,
+        market_analyzer=market_analyzer,
+        agent_kit_service=agent_service,
+        market_data_service=market_data_service,
+        config=config
+    )
+    
+    # Initialize strategy engine
+    strategy_engine = StrategyEngine()
+
+    # Initialize action registry and portfolio agent
+    action_registry = ActionRegistry()
+    trade_agent = TradeAgent(db_manager, market_analyzer, agent_service)
+    portfolio_agent = PortfolioAgent(allora_client, db_manager, strategy_engine, config, action_registry)
+
+    
+    # Initialize chat history manager
+    chat_history_manager = ChatHistoryManager(db_manager=db_manager)
+    
+    # Initialize WebSocket manager
+    websocket_manager = get_websocket_manager()
+    
+    # Initialize chat service
+    chat_service = ChatService(
+        portfolio_agent=portfolio_agent,
+        chat_history_manager=chat_history_manager
+    )
+    
+    # Initialize WebSocket handler
+    chat_ws_handler = ChatWebSocketHandler(
+        portfolio_agent=portfolio_agent,
+        chat_history_manager=chat_history_manager
+    )
+    
+    # Store all services in app state for access in route handlers
+    app.state.db_manager = db_manager
+    app.state.allora_client = allora_client
+    app.state.agent_service = agent_service
+    app.state.market_analyzer = market_analyzer
+    app.state.intelligence_engine = intelligence_engine
+    app.state.strategy_engine = strategy_engine
+    app.state.portfolio_agent = portfolio_agent
+    app.state.chat_service = chat_service
+    app.state.chat_ws_handler = chat_ws_handler
+    app.state.websocket_manager = websocket_manager
+    
+    return app

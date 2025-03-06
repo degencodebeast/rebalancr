@@ -1,3 +1,57 @@
+from fastapi import WebSocket, WebSocketDisconnect
+import logging
+from rebalancr.intelligence.agent_kit.service import AgentKitService
+from rebalancr.config import Settings
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
+
+logger = logging.getLogger(__name__)
+
+async def handle_chat_websocket(websocket: WebSocket):
+    """WebSocket handler for chat interactions using ReAct agent"""
+    await websocket.accept()
+    
+    # Load configuration and get AgentKit service
+    settings = Settings()
+    service = AgentKitService.get_instance(settings)
+    
+    # Create a new ReAct agent for this connection
+    memory = MemorySaver()
+    config = {"configurable": {"thread_id": "CDP Agentkit Chatbot Example!"}}
+    
+    agent_executor = create_react_agent(
+        service.llm,
+        tools=service.tools,
+        checkpointer=memory,
+        state_modifier=(
+            "You are a helpful financial agent that can perform on-chain transactions "
+            "like depositing funds and rebalancing portfolios. Before executing actions, "
+            "verify wallet details and explain your steps. If a 5XX error occurs, ask the user "
+            "to try again later."
+        ),
+    )
+    
+    try:
+        while True:
+            # Await message from the frontend client
+            user_message = await websocket.receive_text()
+            
+            # Send prompt to the agent using the ReAct agent executor
+            for chunk in agent_executor.stream(
+                {"messages": [HumanMessage(content=user_message)]}, config
+            ):
+                # Stream back the agent's responses
+                if "agent" in chunk:
+                    response = chunk["agent"]["messages"][0].content
+                    await websocket.send_text(response)
+                elif "tools" in chunk:
+                    response = chunk["tools"]["messages"][0].content
+                    await websocket.send_text(response)
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+
+
 #NOTE: This is not used anymore, but I'm keeping it here for reference
 # new chat handler is in websockets/chat_handler.py
 

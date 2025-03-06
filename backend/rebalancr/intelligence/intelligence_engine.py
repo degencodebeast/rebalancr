@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 
 import pandas as pd
+from rebalancr.intelligence.agent_kit.service import AgentKitService
 
 from .allora.client import AlloraClient
 from .market_analysis import MarketAnalyzer
@@ -26,13 +27,13 @@ class IntelligenceEngine:
         self, 
         allora_client: AlloraClient,
         market_analyzer: MarketAnalyzer,
-        agent_kit_client: AgentKitClient,
+        agent_kit_service: AgentKitService,
         market_data_service: MarketDataAnalyzer,
         config: Dict[str, Any]
     ):
         self.allora_client = allora_client
         self.market_analyzer = market_analyzer
-        self.agent_kit_client = agent_kit_client
+        self.agent_kit_service = agent_kit_service
         self.market_data_service = market_data_service
         self.config = config
 
