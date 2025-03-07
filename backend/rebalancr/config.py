@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     }
     
     # External APIs
+    OPENAI_MODEL: Optional[str] = os.getenv("OPENAI_MODEL")
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    
     PRIVY_APP_ID: Optional[str] = os.getenv("PRIVY_APP_ID")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
     PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")

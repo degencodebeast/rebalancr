@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Optional
 from ..dependencies import get_chat_service
 from .auth import get_current_user_id
 from ..services.chat_service import ChatService
+from ...intelligence.agent_kit.agent_manager import AgentManager
+from ...config import Settings, get_settings
 
 router = APIRouter(
     prefix="/chat",
@@ -26,11 +28,8 @@ async def send_message(
     chat_service: ChatService = Depends(get_chat_service)
 ):
     """Send a message to the chat agent"""
-    response = await chat_service.process_message(
-        user_id=user_id,
-        message=request.message,
-        conversation_id=request.conversation_id
-    )
+    agent_manager = AgentManager.get_instance(get_settings())
+    response = await agent_manager.get_agent_response(user_id, request.message, request.conversation_id)
     return response
 
 @router.get("/conversations")

@@ -1,55 +1,155 @@
-from fastapi import WebSocket, WebSocketDisconnect
 import logging
-from rebalancr.intelligence.agent_kit.service import AgentKitService
-from rebalancr.config import Settings
+from typing import Dict, Any, Optional
+
+from fastapi import WebSocket, WebSocketDisconnect
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import create_react_agent
+
+from ..intelligence.agent_kit.agent_manager import AgentManager
+from ..config import Settings
+from ..websockets.websocket_manager import websocket_manager
 
 logger = logging.getLogger(__name__)
 
-async def handle_chat_websocket(websocket: WebSocket):
-    """WebSocket handler for chat interactions using ReAct agent"""
-    await websocket.accept()
+# class WebSocketMessageHandler:
+#     """
+#     Handles WebSocket-specific message formatting and sending.
+#     Focuses solely on WebSocket protocol concerns, not agent management.
+#     """
     
-    # Load configuration and get AgentKit service
+#     def __init__(self, websocket: WebSocket):
+#         """Initialize with a WebSocket connection"""
+#         self.websocket = websocket
+    
+#     async def send_message(self, message_type: str, content: Dict[str, Any]):
+#         """Send a formatted message through the WebSocket"""
+#         await self.websocket.send_json({
+#             "type": message_type,
+#             **content
+#         })
+    
+#     async def send_welcome(self):
+#         """Send a welcome message to the client"""
+#         await self.send_message("system", {
+#             "content": "Welcome! I'm your financial assistant. How can I help you today?"
+#         })
+    
+#     async def send_typing(self):
+#         """Indicate that the agent is processing the message"""
+#         await self.send_message("typing", {
+#             "content": "Processing your request..."
+#         })
+    
+#     async def send_error(self, error_message: str):
+#         """Send an error message to the client"""
+#         await self.send_message("error", {
+#             "content": error_message
+#         })
+
+async def handle_chat_websocket(websocket: WebSocket, user_id: str, session_id: Optional[str] = None):
+    """
+    WebSocket handler for chat interactions using the AgentManager
+    
+    This function focuses solely on WebSocket protocol concerns, while delegating
+    agent management to the AgentManager class.
+    
+    Args:
+        websocket: WebSocket connection
+        user_id: User identifier
+        session_id: Optional session identifier
+    """
+    await websocket_manager.connect(websocket, user_id)
+    
     settings = Settings()
-    service = AgentKitService.get_instance(settings)
-    
-    # Create a new ReAct agent for this connection
-    memory = MemorySaver()
-    config = {"configurable": {"thread_id": "CDP Agentkit Chatbot Example!"}}
-    
-    agent_executor = create_react_agent(
-        service.llm,
-        tools=service.tools,
-        checkpointer=memory,
-        state_modifier=(
-            "You are a helpful financial agent that can perform on-chain transactions "
-            "like depositing funds and rebalancing portfolios. Before executing actions, "
-            "verify wallet details and explain your steps. If a 5XX error occurs, ask the user "
-            "to try again later."
-        ),
-    )
+    agent_manager = AgentManager.get_instance(settings)
     
     try:
+        # Send welcome message
+        await websocket_manager.send_personal_message({
+            "type": "system",
+            "content": "Welcome! I'm your financial assistant. How can I help you today?"
+        }, user_id)
+        
         while True:
-            # Await message from the frontend client
-            user_message = await websocket.receive_text()
+            # Receive message from client
+            data = await websocket.receive_json()
+            message = data.get("message", "")
             
-            # Send prompt to the agent using the ReAct agent executor
-            for chunk in agent_executor.stream(
-                {"messages": [HumanMessage(content=user_message)]}, config
-            ):
-                # Stream back the agent's responses
-                if "agent" in chunk:
-                    response = chunk["agent"]["messages"][0].content
-                    await websocket.send_text(response)
-                elif "tools" in chunk:
-                    response = chunk["tools"]["messages"][0].content
-                    await websocket.send_text(response)
+            if not message:
+                await websocket_manager.send_personal_message({
+                    "type": "error",
+                    "message": "Empty message received"
+                }, user_id)
+                continue
+                
+            # Show typing indicator
+            await websocket_manager.send_personal_message({
+                "type": "typing",
+                "content": "Processing your request..."
+            }, user_id)
+            
+            # Process with agent via AgentManager
+            async with agent_manager.get_agent_executor(user_id, session_id) as agent_executor:
+                # Stream responses from the agent
+                async for chunk in agent_executor.astream(
+                    input={"messages": [HumanMessage(content=message)]},
+                    config={"configurable": {"thread_id": f"{user_id}-{session_id}"}}
+                ):
+                    # Handle agent responses
+                    if "agent" in chunk:
+                        content = chunk["agent"]["messages"][0].content
+                        await websocket_manager.send_personal_message({
+                            "type": "chat",
+                            "content": content
+                        }, user_id)
+                    
+                    # Handle tool executions
+                    elif "tools" in chunk:
+                        content = chunk["tools"]["messages"][0].content
+                        await websocket_manager.send_personal_message({
+                            "type": "tool",
+                            "content": content
+                        }, user_id)
+                        
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
+        logger.info(f"WebSocket disconnected for user {user_id}")
+    except Exception as e:
+        logger.error(f"Error in WebSocket handler: {str(e)}")
+        try:
+            await websocket_manager.send_personal_message({
+                "type": "error",
+                "message": f"An error occurred: {str(e)}"
+            }, user_id)
+        except:
+            pass  # Connection might already be closed
+    finally:
+        await websocket_manager.disconnect(websocket, user_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #NOTE: This is not used anymore, but I'm keeping it here for reference

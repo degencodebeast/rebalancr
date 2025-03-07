@@ -12,7 +12,6 @@ from ..intelligence.agent_kit.wallet_provider import get_wallet_provider
 from ..intelligence.agent_kit.chat_agent import PortfolioAgent
 from ..intelligence.allora.client import AlloraClient
 from ..chat.history_manager import ChatHistoryManager
-from .websocket import connection_manager
 from ..websockets.chat_handler import ChatWebSocketHandler
 from ..services.market import MarketDataService
 from ..strategy.risk_manager import RiskManager
@@ -176,6 +175,13 @@ app = initialize_services(app)
 # # async def websocket_endpoint(websocket: WebSocket, user_id: str):
 # #     """WebSocket endpoint for chat communication"""
 # #     await connection_manager.connect(websocket, user_id)
+
+#I should use this for the chat websocket
+# @app.websocket("/ws/{user_id}")
+# async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: Optional[str] = None):
+#     await handle_chat_websocket(websocket, user_id, session_id)
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     # await websocket.accept()

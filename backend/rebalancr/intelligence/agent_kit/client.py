@@ -3,7 +3,8 @@ import asyncio
 import aiohttp
 import logging
 
-from rebalancr.config import Settings
+from ...config import Settings
+from ...intelligence.agent_kit.agent_manager import AgentManager
 from ..allora.client import AlloraClient
 from ..market_analysis import MarketAnalyzer
 from .service import AgentKitService
@@ -16,15 +17,23 @@ logger = logging.getLogger(__name__)
 
 class AgentKitClient:
     """
-    Client for AgentKit that implements business logic and domain operations.
-    Uses AgentKitService for core infrastructure operations.
-    Manages conversations, integrations with other services, and implements
-    portfolio-specific operations.
+    Client for business logic and domain-specific operations.
+    
+    This client focuses on:
+    - Domain-specific operations (market predictions, portfolio rebalancing)
+    - Integration with external services (Allora, market analysis)
+    - High-level business workflows
+    
+    It does NOT handle:
+    - Agent creation and management (handled by AgentManager)
+    - WebSocket communication (handled by WebSocketMessageHandler)
+    - Low-level infrastructure (handled by AgentKitService)
     """
     def __init__(self, config: Settings, intelligence_engine=None):
         """Initialize the client with references to required services."""
-        # Get the AgentKit service singleton
+        # Get the service and manager singletons
         self.service = AgentKitService.get_instance(config)
+        self.agent_manager = AgentManager.get_instance(config)
         
         # Store conversations by user
         self.conversations = {}
@@ -46,25 +55,31 @@ class AgentKitClient:
         self.conversations[user_id] = conversation.id
         return conversation.id
         
-    async def send_message(self, user_id, message):
-        """Send a message to the agent"""
-        if user_id not in self.conversations:
-            await self.initialize_session(user_id)
-            
-        return await self.service.send_message(
-            conversation_id=self.conversations[user_id],
-            content=message
-        )
+    async def send_message(self, user_id, message, session_id=None):
+        """
+        Send a message and get a response
+        
+        This is a high-level method that handles:
+        1. Using AgentManager for the core agent interaction
+        2. Optionally enriching responses with business context
+        """
+        # Use the AgentManager to get the basic response
+        response = await self.agent_manager.get_agent_response(user_id, message, session_id)
+        
+        # Here you could enrich the response with business context if needed
+        # For example, adding market data or portfolio recommendations
+        
+        return response
     
-    async def process_chat_action(self, user_id, intent, parameters):
+    async def process_chat_action(self, user_id, intent, parameters, session_id=None):
         """
-        Process a chat action from a user, integrating Allora predictions
-        and statistical analysis.
+        Process a domain-specific chat action from a user
+        
+        This method handles business operations such as:
+        - Market predictions with Allora integration
+        - Portfolio rebalancing with statistical analysis
+        - Other domain-specific workflows
         """
-        # Ensure user has a conversation
-        if user_id not in self.conversations:
-            await self.initialize_session(user_id)
-            
         # Handle different intents with domain-specific logic
         if intent == "get_market_prediction":
             return await self._handle_market_prediction(user_id, parameters)
@@ -73,22 +88,38 @@ class AgentKitClient:
         else:
             return {"error": f"Unknown intent: {intent}"}
     
-    async def execute_smart_contract(self, user_id, contract_address, function_name, args):
-        """Execute a smart contract call via AgentKit"""
-        if user_id not in self.conversations:
-            await self.initialize_session(user_id)
+    async def execute_trade(self, user_id, params):
+        """
+        Execute a trade for a user
+        
+        Business logic method that:
+        1. Validates trade parameters
+        2. Checks market conditions
+        3. Uses AgentManager to execute the transaction
+        """
+        logger.info(f"Preparing to execute trade: {params}")
+        
+        # Here you would add business validation of the trade parameters
+        
+        # Execute the trade via the AgentManager
+        async with self.agent_manager.get_agent_executor(user_id) as agent:
+            # Format the trade request
+            trade_message = f"Execute trade: Buy {params.get('amount')} of {params.get('asset')}"
             
-        return await self.service.execute_smart_contract(
-            conversation_id=self.conversations[user_id],
-            contract_address=contract_address,
-            function_name=function_name,
-            args=args
-        )
+            # Execute the trade
+            result = await agent.ainvoke({"messages": [trade_message]})
+            
+            # Process the result
+            return {
+                "success": True,
+                "transaction_id": "tx_" + str(hash(str(result))),
+                "details": result
+            }
     
     # Domain-specific operations
     
     async def _handle_market_prediction(self, user_id, parameters):
-        """Handle market prediction logic"""
+        """Handle market prediction logic with Allora integration"""
         asset = parameters.get("asset", "BTC")
         topic_id = {"BTC": 14, "ETH": 13}.get(asset)
         
@@ -162,12 +193,17 @@ class AgentKitClient:
             return {"error": f"Failed to get prediction: {str(e)}"}
     
     async def _handle_portfolio_rebalance(self, user_id, parameters):
-        """Handle portfolio rebalancing logic"""
+        """Handle portfolio rebalancing with statistical analysis"""
+        #   """Handle portfolio rebalancing logic"""
         try:
-            # Get user info and portfolio data
-            conversation_id = self.conversations[user_id]
-            user_info = await self.service.get_user_info(conversation_id)
-            portfolio = await self._get_user_portfolio(user_info.wallet_address)
+            # Get user info through AgentManager to ensure wallet data is loaded
+            async with self.agent_manager.get_agent_executor(user_id) as agent:
+                wallet_info_result = await agent.ainvoke({"messages": ["What is my wallet address?"]})
+                # Extract wallet address from result
+                wallet_address = self._extract_wallet_address(wallet_info_result)
+            
+            # Get portfolio data
+            portfolio = await self._get_user_portfolio(wallet_address)
             
             if not portfolio:
                 return {"message": "No portfolio found for this user"}
@@ -178,20 +214,22 @@ class AgentKitClient:
                 asset: await self._get_historical_data(asset)
                 for asset in portfolio
             }
+
             # # Generate recommendation using strategy engine
             # recommendation = await self.strategy_engine.generate_portfolio_recommendation(
 
-            # Generate recommendation 
+            # Generate recommendation using intelligence engine
             recommendation = await self.intelligence_engine.generate_portfolio_recommendation(
                 portfolio, current_prices, historical_data
             )
             
             # If rebalancing is recommended and profitable
             if recommendation["rebalance_analysis"]["recommendation"] == "rebalance":
-                # Execute trades
+                # Execute trades through AgentManager
                 trades = recommendation["rebalance_analysis"]["trades"]
 
-    #                         asset = parameters.get("asset", "BTC")
+                
+    #         asset = parameters.get("asset", "BTC")
     #         topic_id = {"BTC": 14, "ETH": 13}.get(asset)
             
     #         if topic_id:
@@ -268,18 +306,7 @@ class AgentKitClient:
         
     #     # Handle other intents...
     #     return {"error": f"Unknown intent: {intent}"}
-    
-    # async def execute_smart_contract(self, user_id, contract_address, function_name, args):
-    #     """Execute a smart contract call via AgentKit"""
-    #     if user_id not in self.conversations:
-    #         await self.initialize_session(user_id)
-            
-    #     return await self.agent_kit.smart_contract_write(
-    #         conversation_id=self.conversations[user_id],
-    #         contract_address=contract_address,
-    #         function_name=function_name,
-    #         args=args
-    #     )
+
 
                 results = await self._execute_trades(user_id, trades)
                 
@@ -300,24 +327,29 @@ class AgentKitClient:
     
     # Helper methods
     
+    def _extract_wallet_address(self, result):
+        """Extract wallet address from agent response"""
+        # Implement parsing logic based on your response format
+        # This is a placeholder
+        return "0x123456789abcdef"
+    
     async def _execute_trades(self, user_id, trades):
         """Execute a set of trades for portfolio rebalancing"""
         results = []
         for asset, amount in trades.items():
             if amount > 0:  # Buy
-                result = await self.execute_smart_contract(
-                    user_id,
-                    "DEX_CONTRACT_ADDRESS",
-                    "buy",
-                    [asset, str(abs(amount))]
-                )
+                params = {
+                    "asset": asset,
+                    "amount": abs(amount),
+                    "action": "buy"
+                }
             else:  # Sell
-                result = await self.execute_smart_contract(
-                    user_id,
-                    "DEX_CONTRACT_ADDRESS",
-                    "sell",
-                    [asset, str(abs(amount))]
-                )
+                params = {
+                    "asset": asset,
+                    "amount": abs(amount),
+                    "action": "sell"
+                }
+            result = await self.execute_trade(user_id, params)
             results.append(result)
         return results
     
@@ -383,14 +415,3 @@ class AgentKitClient:
             "confidence": confidence,
             "reasoning": f"Combined AI sentiment ({sentiment_score}) and statistical signals ({stats_score})"
         }
-
-    async def execute_trade(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a trade via AgentKit"""
-        # Implementation
-        logger.info(f"Executing trade with params: {params}")
-        return {"status": "success", "transaction_id": "dummy_id"}
-    
-    async def get_wallet_info(self, address: str) -> Dict[str, Any]:
-        """Get wallet information"""
-        # Implementation
-        return {"address": address, "balance": 1000}

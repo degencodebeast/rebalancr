@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from ..intelligence.agent_kit.chat_agent import PortfolioAgent
 from ..chat.history_manager import ChatHistoryManager
-from ..api.websocket import connection_manager
+from ..websockets.websocket_manager import websocket_manager as connection_manager
 
 logger = logging.getLogger(__name__)
 
