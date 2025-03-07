@@ -1,96 +1,113 @@
-from typing import Dict, List, Any, AsyncGenerator, Optional
+from typing import Dict, List, Any, Optional
 import logging
 import uuid
 
-from ...agent.agent_kit import AgentKit
+from ...websockets.websocket_manager import WebSocketManager, websocket_manager as connection_manager
+from ...intelligence.agent_kit.agent_manager import AgentManager
+from ...database.db_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
 class ChatService:
-    def __init__(self, 
-                 db_manager,
-                 agent_kit: AgentKit,
-                 websocket_manager=None):
-        self.db_manager = db_manager
-        self.agent_kit = agent_kit
-        self.websocket_manager = websocket_manager
-        self.active_conversations = {}
+    """
+    Service layer for non-WebSocket chat operations.
+    Primarily handles REST API endpoints and administrative functions.
+    Real-time chat happens through WebSocket handlers.
+    """
     
-    async def process_message(self, 
-                             user_id: str, 
-                             message: str, 
-                             conversation_id: Optional[str] = None) -> Dict[str, Any]:
-        """Process a user message through the agent and store in database"""
-        
-        # Create new conversation ID if not provided
+    def __init__(self, 
+                 db_manager: DatabaseManager,
+                 agent_manager: AgentManager,
+                 websocket_manager: Optional[WebSocketManager] = None):
+        self.db_manager = db_manager
+        self.agent_manager = agent_manager
+        self.websocket_manager = websocket_manager
+
+    async def get_single_response(self, 
+                                user_id: str, 
+                                message: str, 
+                                conversation_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get a single response through REST API (non-streaming)
+        Used for simple queries that don't require real-time interaction
+        """
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
-        
-        # Store user message in database
-        await self.db_manager.insert_chat_message({
-            "user_id": user_id,
-            "conversation_id": conversation_id,
-            "message": message,
-            "message_type": "user"
-        })
-        
-        # Process message through agent_kit
+
         try:
-            async for response_chunk in self.agent_kit.process_message(user_id, message):
-                # Store agent response in database
-                if response_chunk["type"] == "agent_message":
-                    await self.db_manager.insert_chat_message({
-                        "user_id": user_id,
-                        "conversation_id": conversation_id,
-                        "message": response_chunk["content"],
-                        "message_type": response_chunk["type"]
-                    })
-                
-                # Add conversation_id to response
-                response_chunk["conversation_id"] = conversation_id
-                
-                # Stream through WebSocket if available
-                if self.websocket_manager:
-                    await self.websocket_manager.send_personal_message(
-                        message=response_chunk,
-                        websocket_id=f"user_{user_id}"
-                    )
-        except Exception as e:
-            logger.error(f"Error processing agent response: {str(e)}")
-            error_message = {
-                "type": "error",
-                "content": f"Sorry, I encountered an error: {str(e)}",
-                "conversation_id": conversation_id
+            # Use agent_manager to process the message
+            response = await self.agent_manager.get_completion(
+                user_id=user_id,
+                message=message,
+                conversation_id=conversation_id
+            )
+            
+            return {
+                "conversation_id": conversation_id,
+                "response": response,
+                "status": "success"
             }
             
-            # Store error in database
-            await self.db_manager.insert_chat_message({
-                "user_id": user_id,
+        except Exception as e:
+            logger.error(f"Error getting single response: {str(e)}")
+            return {
                 "conversation_id": conversation_id,
-                "message": error_message["content"],
-                "message_type": "error"
-            })
-            
-            # Send through WebSocket
-            if self.websocket_manager:
-                await self.websocket_manager.send_personal_message(
-                    message=error_message,
-                    websocket_id=f"user_{user_id}"
-                )
-        
-        # Return conversation ID for continuation
-        return {
-            "conversation_id": conversation_id,
-            "message_received": True
-        }
-    
-    async def get_conversation_history(self, user_id: str, conversation_id: str) -> List[Dict[str, Any]]:
-        """Retrieve conversation history for a specific conversation"""
-        return await self.db_manager.get_chat_messages(conversation_id)
-    
-    async def get_user_conversations(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get list of user's conversations"""
-        return await self.db_manager.get_user_conversations(user_id, limit)
+                "response": f"Error: {str(e)}",
+                "status": "error"
+            }
+
+    async def get_conversation_history(self, 
+                                     user_id: str, 
+                                     conversation_id: str) -> List[Dict[str, Any]]:
+        """
+        Retrieve conversation history for a specific conversation
+        Used by REST API endpoints
+        """
+        return await self.agent_manager.get_conversation_history(
+            user_id=user_id,
+            conversation_id=conversation_id
+        )
+
+    async def get_user_conversations(self, 
+                                   user_id: str, 
+                                   limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get list of user's conversations
+        Used for conversation management UI
+        """
+        return await self.agent_manager.get_user_conversations(
+            user_id=user_id,
+            limit=limit
+        )
+
+    async def delete_conversation(self, 
+                                user_id: str, 
+                                conversation_id: str) -> Dict[str, Any]:
+        """
+        Delete a specific conversation
+        Administrative function
+        """
+        try:
+            await self.agent_manager.delete_conversation(
+                user_id=user_id,
+                conversation_id=conversation_id
+            )
+            return {"status": "success", "message": "Conversation deleted"}
+        except Exception as e:
+            logger.error(f"Error deleting conversation: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def clear_user_history(self, user_id: str) -> Dict[str, Any]:
+        """
+        Clear all conversation history for a user
+        Administrative function
+        """
+        try:
+            await self.agent_manager.clear_user_history(user_id)
+            return {"status": "success", "message": "User history cleared"}
+        except Exception as e:
+            logger.error(f"Error clearing user history: {str(e)}")
+            return {"status": "error", "message": str(e)}
 
 
 # from typing import Dict, Any, List
