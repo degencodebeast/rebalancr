@@ -30,7 +30,8 @@ export default function Dashboard() {
 
   // Connect to WebSocket
   useEffect(() => {
-    const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || '')
+    // const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws")
+    const ws = new WebSocket("ws://localhost:8000/ws")
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -42,15 +43,20 @@ export default function Dashboard() {
     }
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      console.log('Received message:', data)
+      let data;
+      try {
+        data = JSON.parse(event.data);
+        console.log('Received message:', data)
+      } catch (e) {
+        console.error("Failed to parse websocket message as JSON, using raw data instead:", e);
+        data = { content: event.data }; // Fall back to raw text
+      }
+      console.log('Received message content:', data.content);
 
-      // Handle different message types
-      if (data.type === 'chat_message') {
+      // If data.content exists, treat it as a chat message
+      if (data.content) {
         addMessage({
-          id: `assistant-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 9)}`,
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           sender: 'assistant',
           content: data.content,
           timestamp: new Date(),
