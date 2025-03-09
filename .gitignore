@@ -4,9 +4,8 @@ __pycache__/
 *$py.class
 
 .venv/
-# Specific environment files
-frontend/.env
-backend/.env
-
+.env
+/backend/.env
+/frontend/.env
 
 # Add other exclusions as needed... 

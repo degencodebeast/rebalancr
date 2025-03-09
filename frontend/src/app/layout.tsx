@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Bricolage_Grotesque } from 'next/font/google'
+import { Bricolage_Grotesque, Outfit } from 'next/font/google'
 import './globals.scss'
 import '@mantine/core/styles.css'
 import CustomPrivyProvider from '@/components/Layout/CustomPrivyProvider'
@@ -14,9 +14,13 @@ const bricolageGrotesque = Bricolage_Grotesque({
   subsets: ['latin'],
 })
 
+const outfit = Outfit({
+  subsets: ['latin'],
+})
+
 export const metadata: Metadata = {
-  title: 'Rebalancr',
-  description: 'Automated portfolio rebalancing',
+  title: 'Rebalancr | AI automated portfolio manager',
+  description: 'AI automated portfolio manager',
 }
 
 export default function RootLayout({
@@ -29,7 +33,9 @@ export default function RootLayout({
       <head>
         <ColorSchemeScript />
       </head>
-      <body className={`${bricolageGrotesque.className} antialiased`}>
+      <body
+        className={`${bricolageGrotesque.className} ${outfit.className} antialiased`}
+      >
         <CustomReduxProvider>
           <MantineProvider
             theme={{

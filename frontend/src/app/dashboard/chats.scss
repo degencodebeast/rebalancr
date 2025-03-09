@@ -145,3 +145,73 @@
     }
   }
 }
+
+// Add back markdown styling
+.prose {
+  color: white;
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  ul,
+  ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  li {
+    margin-bottom: 0.25rem;
+  }
+
+  p {
+    margin-bottom: 0.75rem;
+  }
+
+  // Table styles
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+
+  th,
+  td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+// Make tables responsive in chat bubbles
+.assistant-bubble .prose {
+  table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

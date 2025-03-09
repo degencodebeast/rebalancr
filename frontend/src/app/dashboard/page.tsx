@@ -8,6 +8,8 @@ import SendIcon from '@/components/icons/SendIcon'
 import '@/app/dashboard/chats.scss'
 import { Button } from '@/components/ui/button'
 import { blo } from 'blo'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // Message type definition
 interface Message {
@@ -212,7 +214,11 @@ export default function Dashboard() {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                <Text c={'#fff'}>{message.content}</Text>
+                <div className="prose prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </Paper>
             </div>
           ))}
