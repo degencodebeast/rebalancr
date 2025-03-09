@@ -2,9 +2,9 @@ from typing import Dict, List, Any, Optional
 import logging
 import uuid
 
-from ...websockets.websocket_manager import WebSocketManager, websocket_manager as connection_manager
-from ...intelligence.agent_kit.agent_manager import AgentManager
-from ...database.db_manager import DatabaseManager
+from ..websockets.websocket_manager import WebSocketManager, websocket_manager as connection_manager
+from ..intelligence.agent_kit.agent_manager import AgentManager
+from ..database.db_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

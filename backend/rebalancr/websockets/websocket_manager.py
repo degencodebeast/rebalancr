@@ -19,15 +19,12 @@ class WebSocketManager:
         
     async def connect(self, websocket: WebSocket, user_id: str):
         """Connect a new WebSocket client"""
-        await websocket.accept()
-        
-        # Initialize user connections if needed
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
             self.topic_subscriptions[user_id] = set()
             
         self.active_connections[user_id].append(websocket)
-        logger.info(f"Client connected: {user_id} (total connections: {len(self.active_connections[user_id])})")
+        logger.info(f"Client connected: {user_id}")
     
     async def disconnect(self, websocket: WebSocket, user_id: str):
         """Disconnect a specific client connection"""
@@ -65,22 +62,13 @@ class WebSocketManager:
             logger.warning(f"Attempted to send message to non-connected user: {user_id}")
             return
             
-        # Prepare message based on type
-        if isinstance(message, dict):
-            json_message = json.dumps(message)
-            is_json = True
-        else:
-            json_message = str(message)
-            is_json = False
-            
-        # Send to all user connections
         failed_connections = []
         for connection in self.active_connections[user_id]:
             try:
-                if is_json:
-                    await connection.send_text(json_message)
+                if isinstance(message, dict):
+                    await connection.send_json(message)
                 else:
-                    await connection.send_text(json_message)
+                    await connection.send_text(str(message))
             except Exception as e:
                 logger.error(f"Error sending message to {user_id}: {str(e)}")
                 failed_connections.append(connection)
@@ -107,7 +95,7 @@ class WebSocketManager:
             for connection in connections:
                 try:
                     if is_json:
-                        await connection.send_text(json_message)
+                        await connection.send_json(json_message)
                     else:
                         await connection.send_text(json_message)
                 except Exception as e:

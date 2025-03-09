@@ -14,6 +14,7 @@ from coinbase_agentkit import (
     AgentKitConfig,
     CdpWalletProvider,
     CdpWalletProviderConfig,
+    WalletProvider
 )
 from coinbase_agentkit_langchain import get_langchain_tools
 from ...database import db_manager
@@ -21,6 +22,7 @@ from ...database import db_manager
 from ...config import Settings
 from .service import AgentKitService
 from ...chat.history_manager import ChatHistoryManager
+from .wallet_provider import PrivyWalletProvider
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +40,10 @@ class AgentManager:
     _instance = None  # Singleton pattern
     
     @classmethod
-    def get_instance(cls, settings: Settings = None):
+    def get_instance(cls, config: Settings):
         """Get singleton instance of AgentManager"""
         if cls._instance is None:
-            if settings is None:
-                raise ValueError("Settings must be provided for AgentManager initialization")
-            cls._instance = cls(settings)
+            cls._instance = cls(config)
         return cls._instance
     
     def __init__(self, settings: Settings):
@@ -53,6 +53,9 @@ class AgentManager:
         self.sqlite_path = settings.sqlite_db_path or "sqlite:///conversations.db"
         self.wallet_data_dir = settings.wallet_data_dir or "./data/wallets"
         
+        # Initialize PrivyWalletProvider instead of CDP wallet provider
+        self.wallet_provider = PrivyWalletProvider.get_instance(settings)
+
         # Ensure wallet data directory exists
         os.makedirs(self.wallet_data_dir, exist_ok=True)
         
@@ -60,62 +63,87 @@ class AgentManager:
         
         self.history_manager = ChatHistoryManager(db_manager)
     
-    def _get_wallet_path(self, user_id: str) -> str:
-        """Get wallet data file path for a user"""
-        return os.path.join(self.wallet_data_dir, f"wallet-{user_id}.json")
+    # Remove _get_wallet_path, load_wallet_data, and save_wallet_data methods
+    # since they're now handled by the PrivyWalletProvider
+
+
+    # def _get_wallet_path(self, user_id: str) -> str:
+    #     """Get wallet data file path for a user"""
+    #     return os.path.join(self.wallet_data_dir, f"wallet-{user_id}.json")
     
-    async def load_wallet_data(self, user_id: str) -> Optional[str]:
-        """Load wallet data for a user if it exists"""
-        wallet_data_path = self._get_wallet_path(user_id)
+    # async def load_wallet_data(self, user_id: str) -> dict:
+    #     """
+    #     Load wallet data for a specific user
         
-        if os.path.exists(wallet_data_path):
-            try:
-                with open(wallet_data_path, "r") as f:
-                    wallet_data = f.read()
-                    logger.info("Loaded wallet data for user %s", user_id)
-                    return wallet_data
-            except Exception as e:
-                logger.error("Error reading wallet data for user %s: %s", user_id, str(e))
+    #     Args:
+    #         user_id: Privy user DID
+            
+    #     Returns:
+    #         Dictionary with wallet data or empty dict if not found
+    #     """
+    #     # Normalize the user ID to handle Privy DIDs
+    #     normalized_user_id = user_id.replace('did:privy:', '')
         
-        logger.info("No existing wallet data found for user %s", user_id)
-        return None
+    #     wallet_file = self.wallet_data_dir / f"wallet-{self.settings.NETWORK_ID}-{normalized_user_id}.json"
+        
+    #     try:
+    #         if wallet_file.exists():
+    #             with open(wallet_file, 'r') as f:
+    #                 return json.load(f)
+    #         return {}
+    #     except Exception as e:
+    #         logger.error(f"Error loading wallet data for user {user_id}: {str(e)}")
+    #         return {}
     
-    async def save_wallet_data(self, user_id: str, wallet_provider: CdpWalletProvider) -> None:
-        """Save wallet data for a user"""
-        wallet_data_path = self._get_wallet_path(user_id)
+    # async def save_wallet_data(self, user_id: str, wallet_provider: CdpWalletProvider) -> None:
+    #     """Save wallet data for a user"""
+    #     wallet_data_path = self._get_wallet_path(user_id)
         
-        try:
-            # Export and save wallet data
-            wallet_data = json.dumps(wallet_provider.export_wallet().to_dict())
-            with open(wallet_data_path, "w") as f:
-                f.write(wallet_data)
-            logger.info("Saved wallet data for user %s", user_id)
-        except Exception as e:
-            logger.error("Error saving wallet data for user %s: %s", user_id, str(e))
+    #     try:
+    #         # Export and save wallet data
+    #         wallet_data = json.dumps(wallet_provider.export_wallet().to_dict())
+    #         with open(wallet_data_path, "w") as f:
+    #             f.write(wallet_data)
+    #         logger.info("Saved wallet data for user %s", user_id)
+    #     except Exception as e:
+    #         logger.error("Error saving wallet data for user %s: %s", user_id, str(e))
     
+    def _normalize_user_id(self, user_id: str) -> str:
+        """Normalize Privy user IDs (handles both did:privy: format and regular format)"""
+        if user_id and user_id.startswith("did:privy:"):
+            return user_id.replace("did:privy:", "")
+        return user_id
+
     async def initialize_agentkit(self, user_id: str) -> AgentKit:
         """Initialize AgentKit with user-specific wallet data"""
         # Load existing wallet data if available
-        wallet_data = await self.load_wallet_data(user_id)
+        # wallet_data = await self.load_wallet_data(user_id)
         
-        # Configure wallet provider
-        cdp_config = None
-        if wallet_data:
-            cdp_config = CdpWalletProviderConfig(wallet_data=wallet_data)
+        # # Configure wallet provider
+        # cdp_config = None
+        # if wallet_data:
+        #     cdp_config = CdpWalletProviderConfig(wallet_data=wallet_data)
         
-        # Initialize wallet provider
-        wallet_provider = CdpWalletProvider(cdp_config)
+        # # Initialize wallet provider
+        # wallet_provider = CdpWalletProvider(cdp_config)
+
+        # Normalize user ID to handle Privy DID format
+        normalized_user_id = self._normalize_user_id(user_id)
+        
+        # Get or create wallet for user via PrivyWalletProvider
+        await self.wallet_provider.get_or_create_wallet(normalized_user_id)
+        
         
         # Initialize AgentKit with action providers from service
         agentkit = AgentKit(
             AgentKitConfig(
-                wallet_provider=wallet_provider,
+                wallet_provider=self.wallet_provider,
                 action_providers=self.service.agent_kit.config.action_providers,
             )
         )
         
-        # Save updated wallet data
-        await self.save_wallet_data(user_id, wallet_provider)
+        # # Save updated wallet data
+        # await self.save_wallet_data(user_id, self.wallet_provider)
         
         return agentkit
     
@@ -125,18 +153,19 @@ class AgentManager:
         Get a ReAct agent executor with SQLite persistence and wallet data
         
         Args:
-            user_id: User identifier
+            user_id: User identifier from Privy authentication
             session_id: Optional session identifier
             
         Returns:
             AsyncIterator to a configured agent executor
         """
         # Create a unique thread ID for this user/session
-        thread_id = f"{user_id}-{session_id}" if session_id else f"{user_id}"
+        normalized_user_id = self._normalize_user_id(user_id)
+        thread_id = f"{normalized_user_id}-{session_id}" if session_id else f"{normalized_user_id}"
         config = {"configurable": {"thread_id": thread_id}}
         
         # Initialize AgentKit with user's wallet data
-        agentkit = await self.initialize_agentkit(user_id)
+        agentkit = await self.initialize_agentkit(normalized_user_id)
         
         # Get tools using helper function
         tools = get_langchain_tools(agentkit)
@@ -160,24 +189,32 @@ class AgentManager:
         Get a response from the agent for a given message (non-WebSocket method)
         
         Args:
-            user_id: User identifier
+            user_id: User identifier from Privy authentication
             message: User message
             session_id: Optional session identifier
             
         Returns:
             Agent response as string
         """
-        thread_id = f"{user_id}-{session_id}" if session_id else user_id
+        normalized_user_id = self._normalize_user_id(user_id)
+        thread_id = f"{normalized_user_id}-{session_id}" if session_id else f"{normalized_user_id}"
         config = {"configurable": {"thread_id": thread_id}}
         
+        # Store user message in history
+        conversation_id = session_id or "default"
+        await self.store_message(normalized_user_id, message, "user", conversation_id)
+        
         response = ""
-        async with self.get_agent_executor(user_id) as agent_executor:
+        async with self.get_agent_executor(normalized_user_id) as agent_executor:
             async for chunk in agent_executor.astream(
                 input={"messages": [HumanMessage(content=message)]},
                 config=config
             ):
                 if "agent" in chunk:
                     response += chunk["agent"]["messages"][0].content
+        
+        # Store agent response in history
+        await self.store_message(normalized_user_id, response, "agent", conversation_id)
         
         return response
     
@@ -186,13 +223,14 @@ class AgentManager:
         Get chat history for a user and optional session
         
         Args:
-            user_id: User identifier
+            user_id: User identifier from Privy authentication
             session_id: Optional session identifier
             
         Returns:
             List of message dictionaries with content and isUser flag
         """
-        thread_id = f"{user_id}-{session_id}" if session_id else user_id
+        normalized_user_id = self._normalize_user_id(user_id)
+        thread_id = f"{normalized_user_id}-{session_id}" if session_id else f"{normalized_user_id}"
         config = {"configurable": {"thread_id": thread_id}}
         
         # Default welcome messages

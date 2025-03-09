@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
     # Database
-    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+    DATABASE_URL: str = "sqlite:///./data/rebalancr.db"
+    #DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
 
     ALLORA_API_KEY: str = os.getenv("ALLORA_API_KEY")
     AGENT_ID: str = os.getenv("AGENT_ID")
@@ -35,18 +36,31 @@ class Settings(BaseSettings):
     }
     
     # External APIs
-    OPENAI_MODEL: Optional[str] = os.getenv("OPENAI_MODEL")
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     
-    PRIVY_APP_ID: Optional[str] = os.getenv("PRIVY_APP_ID")
+    PRIVY_APP_ID: str = os.getenv("PRIVY_APP_ID", "")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
     PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")
+    PRIVY_API_KEY: str = os.getenv("PRIVY_API_KEY", "")  # API key for server wallets
+    PRIVY_WEBHOOK_SECRET: str = os.getenv("PRIVY_WEBHOOK_SECRET", "")  # For webhook verification
 
     CDP_API_KEY_NAME: Optional[str] = os.getenv("CDP_API_KEY_NAME")
     CDP_API_KEY_PRIVATE_KEY: Optional[str] = os.getenv("CDP_API_KEY_PRIVATE_KEY")
     
+    # Privy configuration
+    PRIVY_PUBLIC_KEY: str = os.getenv("PRIVY_PUBLIC_KEY", "")  # For token verification
+    
     # # Add this field to your existing Settings class
     # PRIVY_WALLET_ID: Optional[str] = None
+
+    DATA_DIR: str = os.getenv("DATA_DIR", "./data")
+
+    NETWORK_ID: str = os.getenv("NETWORK_ID", "base-sepolia")
+    
+    # Privy Server Wallets
+    sqlite_db_path: str = "sqlite:///./data/conversations.db"
+    wallet_data_dir: str = "./data/wallets"
     
     class Config:
         env_file = ".env"

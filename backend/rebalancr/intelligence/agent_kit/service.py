@@ -5,6 +5,7 @@ from coinbase_agentkit import (
 )
 from langchain_openai import ChatOpenAI
 from coinbase_agentkit_langchain import get_langchain_tools
+from ...intelligence.agent_kit.wallet_provider import PrivyWalletProvider
 from ...config import Settings
 import logging
 from ...intelligence.agent_kit.intent_registry import INTENT_HANDLER_MAP
@@ -13,18 +14,9 @@ logger = logging.getLogger(__name__)
 
 class AgentKitService:
     """
-    Core infrastructure service for AgentKit functionality.
-    
-    This service focuses exclusively on low-level infrastructure concerns:
-    - Initializing SDK components
-    - Providing action providers
-    - Managing LLM instances
-    - Exposing core AgentKit operations
-    
-    It does NOT handle:
-    - User-specific wallet data (handled by AgentManager)
-    - WebSocket communication (handled by WebSocketMessageHandler)
-    - Business logic (handled by AgentKitClient)
+    Core service provider for AgentKit functionality.
+    Handles initialization, configuration, and provides infrastructure-level operations.
+    Implemented as a singleton to ensure consistent access throughout the application.
     """
     _instance = None  # Singleton pattern
     
@@ -37,16 +29,30 @@ class AgentKitService:
         
     
     def __init__(self, config: Settings):
-        """Initialize the AgentKit service with SDK configuration."""
+        """Initialize the AgentKit service with necessary providers and configuration."""
         logger.info("Initializing AgentKitService")
         
-        # Initialize with a default wallet provider
-        # Note: User-specific wallet data is handled by AgentManager
-        wallet_provider_config = CdpWalletProviderConfig(
-            api_key_name=config.CDP_API_KEY_NAME,
-            api_key_private_key=config.CDP_API_KEY_PRIVATE_KEY
-        )
-        self.wallet_provider = CdpWalletProvider(wallet_provider_config)
+        # # Initialize wallet provider
+        # wallet_provider_config = CdpWalletProviderConfig(
+        #     api_key_name=config.CDP_API_KEY_NAME,
+        #     api_key_private_key=config.CDP_API_KEY_PRIVATE_KEY
+        # )
+        # self.wallet_provider = CdpWalletProvider(wallet_provider_config)
+        
+        # # Initialize AgentKit with action providers
+        # self.agent_kit = AgentKit(AgentKitConfig(
+        #     wallet_provider=self.wallet_provider,
+        #     action_providers=[
+        #         cdp_api_action_provider(),
+        #         cdp_wallet_action_provider(),
+        #         erc20_action_provider(),
+        #         pyth_action_provider(),
+        #         weth_action_provider()
+        #     ]
+        # ))
+
+           # Initialize with PrivyWalletProvider
+        self.wallet_provider = PrivyWalletProvider.get_instance(config)
         
         # Initialize AgentKit with action providers
         self.agent_kit = AgentKit(AgentKitConfig(
@@ -72,7 +78,7 @@ class AgentKitService:
         
         logger.info("AgentKitService initialized successfully")
     
-    # Infrastructure-level methods only
+    # Core infrastructure methods
     
     async def create_conversation(self, user_id):
         """Create a new conversation in AgentKit."""
@@ -82,14 +88,20 @@ class AgentKitService:
         """Send a message to an existing conversation."""
         return await self.agent_kit.send_message(conversation_id, content)
     
-    async def execute_smart_contract(self, contract_address, function_name, args, **kwargs):
+    async def execute_smart_contract(self, conversation_id, contract_address, function_name, args):
         """Execute a smart contract call."""
         return await self.agent_kit.smart_contract_write(
+            conversation_id=conversation_id,
             contract_address=contract_address,
             function_name=function_name,
-            args=args,
-            **kwargs
+            args=args
+            #  args=args,
+            # **kwargs
         )
+    
+    async def get_user_info(self, conversation_id):
+        """Get user information for a conversation."""
+        return await self.agent_kit.get_user_info(conversation_id)
     
     async def get_wallet_info(self, wallet_address):
         """Get information about a wallet."""
@@ -98,7 +110,7 @@ class AgentKitService:
     def get_action_providers(self):
         """Get the registered action providers."""
         return self.agent_kit.action_providers
-    
+        
     def process_custom_intent(self, intent_name, params):
         """
         Process a custom intent based on its name.
@@ -108,4 +120,4 @@ class AgentKitService:
             handler = INTENT_HANDLER_MAP[intent_name]
             return handler(params, self)
         else:
-            return f"No handler found for intent '{intent_name}'" 
+            return f"No handler found for intent '{intent_name}'"

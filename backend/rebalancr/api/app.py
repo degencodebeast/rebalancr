@@ -21,16 +21,16 @@ from ..strategy.engine import StrategyEngine
 from ..intelligence.intelligence_engine import IntelligenceEngine
 from ..intelligence.market_analysis import MarketAnalyzer
 from ..intelligence.agent_kit.client import AgentKitClient
-from ..services.chat import ChatService
 from coinbase_agentkit import AgentKit, AgentKitConfig
 from ..intelligence.agent_kit.trade_agent import TradeAgent
-from .routes import auth, chat_routes, websocket_routes
+from .routes import auth, chat_routes, websocket_routes, wallet_routes
 from ..config import get_settings
-from rebalancr.intelligence.agent_kit.service import AgentKitService
-from rebalancr.config import Settings
+from ..intelligence.agent_kit.service import AgentKitService
+from ..config import Settings
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from .middleware.privy_auth import privy_auth_middleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,238 +40,33 @@ logger = logging.getLogger(__name__)
 config = get_settings()
 
 # Initialize application
-app = FastAPI(title="Rebalancr API")
+app = FastAPI(title="Rebalancr API", version="1.0.0")
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],  # In production, specify exact origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Add Privy authentication middleware
+app.middleware("http")(privy_auth_middleware)
+
 # Initialize all services
 app = initialize_services(app)
 
-# # Initialize database
-# db_manager = DatabaseManager(config.DATABASE_URL)
-
-# # Initialize Allora client
-# allora_client = AlloraClient(api_key=config.ALLORA_API_KEY)
-
-# # Initialize market analyzer and agent kit client
-# market_analyzer = MarketAnalyzer()
-# agent_kit_client = AgentKitClient(config) 
-# agent_service = AgentKitService.get_instance(config)
-
-
-# wallet_provider = agent_service.wallet_provider
-
-# #Initialize wallet provider
-# #
-# # wallet_provider = get_wallet_provider(config)
-# # wallet_provider = get_wallet_provider()
-
-# # # Initialize AgentKit with the Privy wallet provider
-# # agentkit = AgentKit(AgentKitConfig(
-# #     wallet_provider=wallet_provider,
-# #     action_providers=[
-# #         # Your action providers here
-# #     ]
-# # ))
-
-# # Initialize missing components
-# market_data_service = MarketDataService(config)
-# risk_manager = RiskManager(db_manager, config)
-# yield_optimizer = YieldOptimizer(db_manager, market_data_service, config)
-# wormhole_service = WormholeService(config)
-
-# # Initialize intelligence engine
-# intelligence_engine = IntelligenceEngine(
-#     allora_client=allora_client,
-#     market_analyzer=market_analyzer,
-#     agent_kit_service=agent_service,
-#     market_data_service=market_data_service,
-#     config=config
-# )
-
-# # Now initialize strategy engine with all components
-# # strategy_engine = StrategyEngine(
-# #     intelligence_engine=intelligence_engine,
-# #     risk_manager=risk_manager,
-# #     yield_optimizer=yield_optimizer,
-# #     wormhole_service=wormhole_service,
-# #     db_manager=db_manager,
-# #     config=config
-# # )
-
-# strategy_engine = StrategyEngine()
-
-
-# # Initialize agent
-# # portfolio_agent = PortfolioAgent(
-# #     allora_client=allora_client,
-# #     wallet_provider=wallet_provider,
-# #     config={
-# #         "model": config.LLM_MODEL,
-# #         "wallet_data_file": "wallet_data.json"
-# #     }
-# # )
-# trade_agent = TradeAgent(db_manager, market_analyzer, agent_service)
-# action_registry = ActionRegistry()
-# portfolio_agent = PortfolioAgent(allora_client, db_manager, strategy_engine, config, action_registry)
-
-# # Initialize chat history manager
-# chat_history_manager = ChatHistoryManager(db_manager=db_manager)
-
-# # Initialize chat service
-# chat_service = ChatService(
-#     portfolio_agent=portfolio_agent,
-#     chat_history_manager=chat_history_manager
-# )
-
-# # Initialize WebSocket handler
-# chat_ws_handler = ChatWebSocketHandler(
-#     portfolio_agent=portfolio_agent,
-#     chat_history_manager=chat_history_manager
-# )
-
-
-# # Portfolio monitoring function
-# async def monitor_portfolios():
-#     """Background task to monitor portfolios and trigger rebalancing when needed"""
-#     while True:
-#         try:
-#             # Get all active portfolios
-#             active_portfolios = await db_manager.get_active_portfolios()
-            
-#             for portfolio in active_portfolios:
-#                 user_id = portfolio['user_id']
-#                 portfolio_id = portfolio['id']
-                
-#                 # Check if portfolio needs rebalancing
-#                 analysis = await strategy_engine.analyze_rebalance_opportunity(user_id, portfolio_id)
-                
-#                 if analysis.get("rebalance_recommended", False):
-#                     # Notify user that rebalancing is recommended
-#                     await connection_manager.send_personal_message(
-#                         {
-#                             "type": "rebalance_recommendation",
-#                             "portfolio_id": portfolio_id,
-#                             "message": analysis.get("message", "Rebalancing is recommended.")
-#                         },
-#                         user_id
-#                     )
-            
-#             # Wait before next check
-#             await asyncio.sleep(300)  # Check every 5 minutes
-#         except Exception as e:
-#             logger.error(f"Error monitoring portfolios: {str(e)}")
-#             await asyncio.sleep(300)  # Wait and retry
-
-# # WebSocket endpoint
-# #@app.websocket("/ws/{user_id}")
-# # async def websocket_endpoint(websocket: WebSocket, user_id: str):
-# #     """WebSocket endpoint for chat communication"""
-# #     await connection_manager.connect(websocket, user_id)
-
-#I should use this for the chat websocket
-# @app.websocket("/ws/{user_id}")
-# async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: Optional[str] = None):
-#     await handle_chat_websocket(websocket, user_id, session_id)
-
-
+#check whether this is correct or if I need to change it to a different endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # await websocket.accept()
-    # # Load configuration (from .env and elsewhere)
-    # settings = Settings()
-    # # Get the centralized AgentKit service instance
-    # service = AgentKitService.get_instance(settings)
-
     await handle_chat_websocket(websocket)
-
-    #  try:
-    #     # Send welcome message
-    #     await connection_manager.send_personal_message(
-    #         {
-    #             "type": "system_message",
-    #             "message": "Connected to Rebalancr chat service"
-    #         },
-    #         user_id
-    #     )
-        
-    #     # Process messages
-    
-    # # Create a new ReAct agent for this connection
-    # memory = MemorySaver()
-    # config = {"configurable": {"thread_id": "CDP Agentkit Chatbot Example!"}}
-    
-    # agent_executor = create_react_agent(
-    #     service.llm,
-    #     tools=service.tools,
-    #     checkpointer=memory,
-    #     state_modifier=(
-    #         "You are a helpful financial agent that can perform on-chain transactions "
-    #         "like depositing funds and rebalancing portfolios. Before executing actions, "
-    #         "verify wallet details and explain your steps. If a 5XX error occurs, ask the user "
-    #         "to try again later."
-    #     ),
-    # )
-    
-    # try:
-    #     while True:
-    #         #   data = await websocket.receive_json()
-            
-    #         # if data.get("type") == "chat_message":
-    #         #     message = data.get("message", "")
-    #         #     conversation_id = data.get("conversation_id")
-                
-    #         #     if message:
-    #         #         # Process through the chat service
-    #         #         async for response_chunk in chat_service.process_message(
-    #         #             user_id, message, conversation_id
-    #         #         ):
-    #         #             # Send each chunk as it becomes available
-    #         #             await connection_manager.send_personal_message(
-    #         #                 {
-    #         #                     "type": response_chunk["type"],
-    #         #                     "message": response_chunk["content"],
-    #         #                     "conversation_id": response_chunk["conversation_id"]
-    #         #                 },
-    #         #                 user_id
-    #         #             )
-    
-
-    #         # Await message from the frontend client
-    #         user_message = await websocket.receive_text()
-    #         # Send prompt to the agent using the ReAct agent executor
-    #         for chunk in agent_executor.stream(
-    #             {"messages": [HumanMessage(content=user_message)]}, config
-    #         ):
-    #             # Stream back the agent's responses; you can refine types if needed
-    #             if "agent" in chunk:
-    #                 response = chunk["agent"]["messages"][0].content
-    #                 await websocket.send_text(response)
-    #                 #await websocket.send_json(response)
-    #             elif "tools" in chunk:
-    #                 response = chunk["tools"]["messages"][0].content
-    #                 await websocket.send_text(response)
-    #                 #await websocket.send_json(response)
-    # except WebSocketDisconnect:
-    # #      logger.info(f"Client disconnected: {user_id}")
-    # #     connection_manager.disconnect(websocket, user_id)
-    # # except Exception as e:
-    # #     logger.error(f"Error in websocket: {str(e)}")
-    # #     connection_manager.disconnect(websocket, user_id)
-    #     print("WebSocket disconnected")
-
 
 # Include routers
 app.include_router(auth.router)
 app.include_router(chat_routes.router)
 app.include_router(websocket_routes.router, tags=["websocket"])
+app.include_router(wallet_routes.router)
 
 
 # At the end of your app initialization
@@ -285,98 +80,6 @@ async def startup_event():
         app.state.strategy_engine
     )
 
-
-# from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Header, Query
-# from fastapi.middleware.cors import CORSMiddleware
-# from typing import Optional, Dict, List
-# import json
-
-# from rebalancr.api.websocket import connection_manager
-# # from rebalancr.services.chat import ChatService
-# # from rebalancr.services.portfolio import PortfolioService
-# # from rebalancr.services.user import UserService
-# # from rebalancr.services.market import MarketService
-
-# from rebalancr.intelligence.allora.client import AlloraClient
-# from rebalancr.intelligence.market_analysis import MarketAnalyzer
-# from rebalancr.intelligence.agent_kit.client import AgentKitClient
-# from rebalancr.intelligence.market_data import MarketDataService
-# from rebalancr.intelligence.strategy_engine import StrategyEngine
-# from rebalancr.api.websocket_handlers import ChatWebSocketHandler
-# from rebalancr.config import Config
-# from ..db.manager import DatabaseManager
-# from ..intelligence.agent_kit.wallet_provider import get_wallet_provider
-# from ..intelligence.agent_kit.chat_agent import PortfolioAgent
-# from ..chat.history_manager import ChatHistoryManager
-
-# # Import all route modules
-# # from rebalancr.api.routes import portfolio, market, chat, user, social, achievement
-
-# # Configure logging
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-
-# app = FastAPI(
-#     title="Rebalancr API",
-#     description="Portfolio rebalancing and market analysis API",
-#     version="0.1.0"
-# )
-
-# # Configure CORS
-# origins = [
-#     "http://localhost:3000",  # Next.js default port
-#     "http://localhost:8000",
-#     "http://localhost",
-#     # Add your production domains when deploying
-# ]
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     #allow_origins=["*"], // for testing, to allow all origins
-#     allow_origins=origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # chat_service = ChatService()
-# # portfolio_service = PortfolioService()
-# # user_service = UserService()
-# # market_service = MarketService()
-
-# # Initialize services
-# config = Config()
-
-# # Initialize database
-# db_manager = DatabaseManager(config.DATABASE_URL)
-
-# # Initialize Allora client
-# allora_client = AlloraClient(api_key=config.ALLORA_API_KEY)
-
-# # market_analyzer = MarketAnalyzer()
-# # agent_kit_client = AgentKitClient(config)
-# # market_data_service = MarketDataService()
-
-# # # Strategy engine with dual approach (Rose Heart's advice)
-# # strategy_engine = StrategyEngine()
-
-
-# # Initialize wallet provider
-# wallet_provider = get_wallet_provider(config)
-
-# # Initialize agent
-# portfolio_agent = PortfolioAgent(
-#     allora_client=allora_client,
-#     # market_analyzer=market_analyzer,
-#     # agent_kit_client=agent_kit_client,
-#     # market_data_service=market_data_service,
-#     # config=config
-#     wallet_provider=wallet_provider,
-#     config={
-#         "model": config.LLM_MODEL,
-#         "wallet_data_file": "wallet_data.json"
-#     }
-# )
 
 # # # Auth dependency - simplified for hackathon
 # # async def get_user_from_token(token: str = Query(...)):
@@ -477,92 +180,7 @@ async def startup_event():
 # # #         print(f"Error in chat websocket: {str(e)}")
 # # #         connection_manager.disconnect(websocket, user_id)
 
-# # # @app.websocket("/ws/portfolio-updates")
-# # # async def websocket_portfolio_updates(
-# # #     websocket: WebSocket,
-# # #     user_id: str = Depends(get_user_from_token)
-# # # ):
-# # #     portfolio_service = PortfolioService()
-# # #     await connection_manager.connect(websocket, user_id)
-# # #     try:
-# # #         while True:
-# # #             # Instead of waiting for client messages, this could periodically 
-# # #             # push portfolio updates, but for the demo we'll wait for client pings
-# # #             data = await websocket.receive_text()
-            
-# # #             # Get latest portfolio data
-# # #             portfolio = await portfolio_service.get_portfolio(user_id)
-            
-# #             #  # Send updates back to the client
-# #             # await connection_manager.send_personal_message(
-# #             #     {"type": "portfolio_update", "data": portfolio},
-# #             #     user_id
-# #             # )
-            
-#             # Handle subscription message
-#             if data.get("type") == "subscribe":
-#                 topics = data.get("topics", [])
-#                 # Here you would store user's topic subscriptions
-#                 # For demo purposes, just acknowledge
-#                 await connection_manager.send_personal_message(
-#                     {"type": "subscribed", "topics": topics},
-#                     user_id
-#                 )
-            
-#             # Handle portfolio update request
-#             elif data.get("type") == "get_portfolio":
-#                 # Get latest portfolio data
-#                 portfolio = await portfolio_service.get_portfolio(user_id)
-                
-#                 # Send updates back to the client
-#                 await connection_manager.send_personal_message(
-#                     {"type": "portfolio_update", "data": portfolio},
-#                     user_id
-#                 )
-            
-#             # Echo back the message for testing
-#             await connection_manager.send_personal_message(
-#                 {"type": "echo", "data": data},
-#                 user_id
-#             )
 
-#             #   # Handle chat messages
-#             # elif data.get("type") == "chat_message":
-#             #     message = data.get("message", "")
-#             #     if message:
-#             #         # Process message with chat service
-#             #         response = await chat_service.process_message(user_id, message)
-                    
-#             #         # Send response back
-#             #         await connection_manager.send_personal_message(
-#             #             {"type": "chat_response", "data": response},
-#             #             user_id
-#             #         )
-            
-#             # # Handle other message types as needed
-
-#             #print(f"WebSocket error for user {user_id}: {str(e)}")
-            
-#             # Handle specific message types if needed
-#             if message_type == "get_portfolio":
-#                 # Send dummy portfolio data for testing
-#                 await connection_manager.send_personal_message(
-#                     {
-#                         "type": "portfolio_update",
-#                         "data": {"assets": [{"name": "BTC", "value": 10000}]}
-#                     },
-#                     user_id
-#                 )
-#     #   # Process message with our handler
-#     #         await chat_ws_handler.handle_message(websocket, user_id, data)
-            
-    
-#     except WebSocketDisconnect:
-#         logger.info(f"Client disconnected: {user_id}")
-#         connection_manager.disconnect(websocket, user_id)
-#     except Exception as e:
-#         logger.error(f"Error in websocket: {str(e)}")
-#         connection_manager.disconnect(websocket, user_id)
 
 @app.get("/")
 async def home():

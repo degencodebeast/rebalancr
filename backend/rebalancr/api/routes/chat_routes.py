@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from ..dependencies import get_chat_service
 from .auth import get_current_user_id
-from ..services.chat_service import ChatService
+from ...services.chat_service import ChatService
 from ...intelligence.agent_kit.agent_manager import AgentManager
 from ...config import Settings, get_settings
 
@@ -35,11 +35,11 @@ async def send_message(
 @router.get("/conversations")
 async def get_conversations(
     limit: int = 10,
-    user_id: str = Depends(get_current_user_id),
-    chat_service: ChatService = Depends(get_chat_service)
+    user_id: str = Depends(get_current_user_id)
 ):
     """Get list of user's conversations"""
-    conversations = await chat_service.get_user_conversations(user_id, limit)
+    agent_manager = AgentManager.get_instance(get_settings())
+    conversations = await agent_manager.history_manager.get_user_conversations(user_id, limit)
     return {"conversations": conversations}
 
 @router.get("/conversation/{conversation_id}")
