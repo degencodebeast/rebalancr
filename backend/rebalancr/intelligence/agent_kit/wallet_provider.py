@@ -24,6 +24,7 @@ class PrivyProviderConfig(BaseModel):
     """Base configuration for Privy providers."""
     app_id: Optional[str] = Field(None, description="The Privy app ID")
     api_key: Optional[str] = Field(None, description="The Privy API key")
+    app_secret: Optional[str] = Field(None, description="The Privy app secret")
 
 class PrivyWalletProviderConfig(PrivyProviderConfig):
     """Configuration for Privy wallet provider."""
@@ -59,6 +60,7 @@ class PrivyWalletProvider(EvmWalletProvider):
                 app_id=settings.PRIVY_APP_ID,
                 api_key=settings.PRIVY_API_KEY,
                 network_id=settings.NETWORK_ID or "base-sepolia",
+                app_secret=settings.PRIVY_APP_SECRET,
                 gas=EvmGasConfig(
                     gas_limit_multiplier=1.2,
                     fee_per_gas_multiplier=1.2
@@ -159,11 +161,21 @@ class PrivyWalletProvider(EvmWalletProvider):
     
     def _get_auth_headers(self) -> Dict[str, str]:
         """Get headers for Privy API authentication"""
-        return {
+        import base64
+        
+        # Create basic auth header from app ID and secret
+        auth_str = f"{self.config.app_id}:{self.config.app_secret}"
+        encoded_auth = base64.b64encode(auth_str.encode()).decode()
+        
+        headers = {
             "Content-Type": "application/json",
             "privy-app-id": self.config.app_id,
-            "X-API-Key": self.config.api_key
+            "Authorization": f"Basic {encoded_auth}"
         }
+        
+        # If you have an authorization key, would add privy-authorization-signature here
+        
+        return headers
     
     def _get_wallet_path(self, user_id: str) -> str:
         """Get path for storing wallet data for a user"""
@@ -250,15 +262,21 @@ class PrivyWalletProvider(EvmWalletProvider):
         try:
             wallet_id = wallet_data.get('id')
             url = f"{self.base_url}/wallets/{wallet_id}"
+            #url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
             response = requests.get(url, headers=headers)
+            
+            # Check for specific status codes
             if response.status_code == 404:
                 # Wallet not found on Privy, create a new one
                 logger.warning(f"Wallet {wallet_id} not found on Privy, creating new wallet")
                 return await self.create_wallet(user_id)
+            elif response.status_code != 200:
+                # Other error occurred
+                logger.error(f"Error fetching wallet: {response.status_code} {response.text}")
+                raise Exception(f"Failed to fetch wallet info: {response.text}")
                 
-            response.raise_for_status()
             wallet_data = response.json()
             
             # Set wallet data for this instance if it's the first wallet
@@ -320,39 +338,48 @@ class PrivyWalletProvider(EvmWalletProvider):
         tx_hash = self.send_transaction(tx_params)
         return tx_hash
     
-    def sign_message(self, message: Union[str, bytes]) -> HexStr:
+    async def sign_message(self, message: Union[str, bytes]) -> HexStr:
         """Sign a message with the wallet"""
-        if not self._wallet_data:
-            raise ValueError("No wallet initialized. Call get_or_create_wallet first.")
+        # if not self._wallet_data:
+        #     raise ValueError("No wallet initialized. Call get_or_create_wallet first.")
         
         wallet_id = self._wallet_data.get('id')
         
-        # Convert message to bytes if it's a string
+        # Format request according to JSON-RPC style
+        url = f"{self.base_url}/wallets/{wallet_id}/rpc"
+        
+        # Configure message format
         if isinstance(message, str):
             if message.startswith('0x'):
-                message_bytes = bytes.fromhex(message[2:])
+                encoding = "hex"
+                message_value = message
             else:
-                message_bytes = message.encode('utf-8')
+                encoding = "utf-8" 
+                message_value = message
         else:
-            message_bytes = message
-            
-        # Create message hash
-        message_hash = Web3.keccak(message_bytes).hex()
+            encoding = "hex"
+            message_value = "0x" + message.hex()
+        
+        payload = {
+            "chain_type": "ethereum",
+            "method": "personal_sign",
+            "params": {
+                "message": message_value,
+                "encoding": encoding
+            }
+        }
         
         try:
-            url = f"{self.base_url}/wallets/{wallet_id}/sign"
             headers = self._get_auth_headers()
-            
-            payload = {
-                "message_hash": message_hash,
-                "chain_id": str(self._network.chain_id)
-            }
             
             response = requests.post(url, headers=headers, json=payload)
             response.raise_for_status()
-            result = response.json()
             
-            return result.get("signature")
+            result = response.json()
+            if "data" in result and "signature" in result["data"]:
+                return result["data"]["signature"]
+            else:
+                raise ValueError(f"Invalid response from Privy API: {result}")
             
         except Exception as e:
             logger.error(f"Error signing message: {str(e)}")
@@ -395,19 +422,38 @@ class PrivyWalletProvider(EvmWalletProvider):
         prepared_tx = self._prepare_transaction(transaction)
         
         try:
-            url = f"{self.base_url}/wallets/{wallet_id}/sign"
+            url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
             payload = {
-                "transaction": prepared_tx,
-                "chain_id": str(self._network.chain_id),
+                "chain_type": "ethereum",
+                "method": "eth_signTransaction",
+                "params": prepared_tx
             }
             
             response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
+            
+            # Check for HTTP errors
+            if response.status_code != 200:
+                raise Exception(f"Error signing transaction: {response.status_code} {response.text}")
+            
             result = response.json()
             
-            return result.get("signature")
+            # Check if response contains expected data
+            if "data" in result and "rawTransaction" in result["data"]:
+                # Create a SignedTransaction object
+                class PrivySignedTransaction:
+                    def __init__(self, raw_transaction):
+                        self.rawTransaction = raw_transaction
+                
+                # Convert hex string to bytes if needed
+                raw_tx = result["data"]["rawTransaction"]
+                if isinstance(raw_tx, str) and raw_tx.startswith("0x"):
+                    raw_tx = bytes.fromhex(raw_tx[2:])
+                    
+                return PrivySignedTransaction(raw_tx)
+            else:
+                raise ValueError(f"Invalid response from Privy API: {result}")
             
         except Exception as e:
             logger.error(f"Error signing transaction: {str(e)}")
@@ -427,20 +473,29 @@ class PrivyWalletProvider(EvmWalletProvider):
         idempotency_key = f"tx-{wallet_id}-{prepared_tx.get('nonce', '')}-{uuid.uuid4()}"
         
         try:
-            url = f"{self.base_url}/wallets/{wallet_id}/send"
+            url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
             payload = {
-                "transaction": prepared_tx,
-                "chain_id": str(self._network.chain_id),
+                "chain_type": "ethereum",
+                "method": "eth_sendTransaction",
+                "params": prepared_tx,
                 "idempotency_key": idempotency_key
             }
             
             response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
+            
+            # Check for HTTP errors
+            if response.status_code != 200:
+                raise Exception(f"Error sending transaction: {response.status_code} {response.text}")
+            
             result = response.json()
             
-            return result.get("transaction_hash")
+            # Check if response contains expected data
+            if "data" in result and "transactionHash" in result["data"]:
+                return result["data"]["transactionHash"]
+            else:
+                raise ValueError(f"Invalid response from Privy API: {result}")
             
         except Exception as e:
             logger.error(f"Error sending transaction: {str(e)}")

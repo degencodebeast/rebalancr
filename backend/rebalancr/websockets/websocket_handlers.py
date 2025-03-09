@@ -43,6 +43,15 @@ async def handle_websocket(websocket: WebSocket):
     # Register connection with WebSocket manager
     await websocket_manager.connect(websocket, user_id)
     
+    # Get or create wallet for this user
+    agent_manager = get_agent_manager()
+    try:
+        # This will create a wallet if it doesn't exist
+        wallet = await agent_manager.wallet_provider.get_or_create_wallet(user_id)
+        logger.info(f"Wallet ready for user {user_id}: {wallet.get('address')}")
+    except Exception as e:
+        logger.error(f"Error initializing wallet for user {user_id}: {str(e)}")
+    
     try:
         # Send welcome message
         await websocket_manager.send_personal_message({
@@ -200,7 +209,7 @@ async def handle_wallet_info(websocket: WebSocket, user_id: str, data: Dict[str,
             wallet_address = agent_manager.wallet_provider.get_address()
         
         # Get wallet balance
-        balance = agent_manager.wallet_provider.get_balance()
+        balance = agent_manager.wallet_provider.get_balance(user_id)
         
         # Format balance as human-readable with token symbol
         # Note: Adjust based on your actual implementation

@@ -62,3 +62,6 @@ class ChatHistory(BaseModel):
     user_id: str
     conversation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
+
+
+
