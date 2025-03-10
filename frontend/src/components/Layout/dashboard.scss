@@ -34,14 +34,14 @@
 }
 
 .mantine-AppShell-navbar {
-  background-color: #121212;
+  background-color: #e8ecff;
   padding-left: 24px;
   padding-right: 48px;
   border-right: 1px solid #f1f1f1;
 }
 
 .mantine-AppShell-header {
-  background-color: #121212;
+  background-color: #e8ecff;
   padding: 16px 24px;
   display: flex;
   align-items: center;
@@ -49,14 +49,14 @@
 }
 
 .mantine-NavLink-root {
-  color: #f0f0f0;
+  color: #000000b3;
   border-radius: 10px;
   transition: all 0.2s ease;
   padding: 16px;
   gap: 16px;
 
   &:hover {
-    background-color: #333333;
+    background-color: #8c52ff14;
   }
 
   .mantine-NavLink-section {
@@ -65,6 +65,7 @@
 
   &[data-active='true'] {
     background-color: #8c52ff;
+    color: white !important;
 
     .mantine-NavLink-label {
       font-weight: 500;
@@ -81,14 +82,18 @@
   }
 
   .mantine-NavLink-label {
-    color: #f0f0f0;
+    color: #000000b3;
     font-size: 20px;
   }
 
   .mantine-NavLink-section {
-    color: #f0f0f0;
+    color: #000000b3;
   }
 }
+
+// .mantine-NavLink-label {
+//   color: #000000b3 !important;
+// }
 
 .mantine-NavLink-section svg {
   width: 25px !important;
