@@ -16,6 +16,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Client Layer (business logic)
+#     ↓ calls
+# Service Layer (send_message)
+#     ↓ calls 
+# Agent Manager (get_agent_response)
+#     ↓ uses
+# ReAct Pattern Implementation
+
+
 class AgentKitClient:
     """
     Client for business logic and domain-specific operations.

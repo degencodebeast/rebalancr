@@ -9,11 +9,19 @@ from rebalancr.execution.providers.kuru import kuru_action_provider
 from rebalancr.execution.providers.market_action import market_action_provider
 from rebalancr.execution.providers.portfolio import portfolio_action_provider
 from rebalancr.execution.providers.rebalancer import rebalancer_action_provider
-from ...intelligence.agent_kit.wallet_provider import PrivyWalletProvider
+from ...api.dependencies import get_agent_manager, get_wallet_provider
 from ...config import Settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Client Layer (business logic)
+#     ↓ calls
+# Service Layer (send_message)
+#     ↓ calls 
+# Agent Manager (get_agent_response)
+#     ↓ uses
+# ReAct Pattern Implementation
 
 class AgentKitService:
     """
@@ -55,7 +63,8 @@ class AgentKitService:
         # ))
 
            # Initialize with PrivyWalletProvider
-        self.wallet_provider = PrivyWalletProvider.get_instance(config)
+        self.wallet_provider =  get_wallet_provider()
+        self.agent_manager = get_agent_manager()
         
         # Initialize AgentKit with action providers
         self.agent_kit = AgentKit(AgentKitConfig(
@@ -95,7 +104,7 @@ class AgentKitService:
         
     async def send_message(self, conversation_id, content):
         """Send a message to an existing conversation."""
-        return await self.agent_manager.send_message(conversation_id, content)
+        return await self.agent_manager.get_agent_response(conversation_id, content)
     
     # async def execute_smart_contract(self, conversation_id, contract_address, function_name, args):
     #     """Execute a smart contract call."""
@@ -108,9 +117,9 @@ class AgentKitService:
     #         # **kwargs
     #     )
     
-    async def get_user_info(self, conversation_id):
-        """Get user information for a conversation."""
-        return await self.agent_kit.get_user_info(conversation_id)
+    # async def get_user_info(self, conversation_id):
+    #     """Get user information for a conversation."""
+    #     return await self.agent_kit.get_user_info(conversation_id)
     
     # async def get_wallet_info(self, wallet_address):
     #     """Get information about a wallet."""

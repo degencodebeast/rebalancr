@@ -39,17 +39,17 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     
-    PRIVY_APP_ID: str = os.getenv("PRIVY_APP_ID", "")
+    PRIVY_APP_ID: str = os.getenv("PRIVY_APP_ID")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
-    PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")
-    PRIVY_API_KEY: str = os.getenv("PRIVY_API_KEY", "")  # API key for server wallets
-    PRIVY_WEBHOOK_SECRET: str = os.getenv("PRIVY_WEBHOOK_SECRET", "")  # For webhook verification
+    #PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")
+    #PRIVY_API_KEY: str = os.getenv("PRIVY_API_KEY")  # API key for server wallets
+    #PRIVY_WEBHOOK_SECRET: str = os.getenv("PRIVY_WEBHOOK_SECRET")  # For webhook verification
 
     CDP_API_KEY_NAME: Optional[str] = os.getenv("CDP_API_KEY_NAME")
     CDP_API_KEY_PRIVATE_KEY: Optional[str] = os.getenv("CDP_API_KEY_PRIVATE_KEY")
     
     # Privy configuration
-    PRIVY_PUBLIC_KEY: str = os.getenv("PRIVY_PUBLIC_KEY", "")  # For token verification
+    #PRIVY_PUBLIC_KEY: str = os.getenv("PRIVY_PUBLIC_KEY")  # For token verification
     
     # # Add this field to your existing Settings class
     # PRIVY_WALLET_ID: Optional[str] = None

@@ -17,15 +17,24 @@ from coinbase_agentkit import (
     WalletProvider
 )
 from coinbase_agentkit_langchain import get_langchain_tools
-from rebalancr.api.dependencies import get_chat_history_manager, get_db_manager
+from ...api.dependencies import get_chat_history_manager, get_db_manager
 from ...database import db_manager
 
 from ...config import Settings
-from .service import AgentKitService
+#from .service import AgentKitService
 from ...chat.history_manager import ChatHistoryManager
 from .wallet_provider import PrivyWalletProvider
 
 logger = logging.getLogger(__name__)
+
+
+# Client Layer (business logic)
+#     ↓ calls
+# Service Layer (send_message)
+#     ↓ calls 
+# Agent Manager (get_agent_response)
+#     ↓ uses
+# ReAct Pattern Implementation
 
 class AgentManager:
     """
@@ -50,7 +59,7 @@ class AgentManager:
     def __init__(self, settings: Settings):
         """Initialize the AgentManager with settings"""
         self.settings = settings
-        self.service = AgentKitService.get_instance(settings)
+        #self.service = AgentKitService.get_instance(settings)
         self.sqlite_path = settings.sqlite_db_path or "sqlite:///conversations.db"
         self.wallet_data_dir = settings.wallet_data_dir or "./data/wallets"
         self.action_providers = self.service.get_action_providers()
@@ -204,9 +213,9 @@ class AgentManager:
         config = {"configurable": {"thread_id": thread_id}}
         
         # Store user message in history
-        #conversation_id = session_id or "default"
+        conversation_id = session_id or "default"
         #check to be sure that this does not clash with store_message function
-        conversation_id = self.db_manager.create_conversation(normalized_user_id)
+        #conversation_id = self.db_manager.create_conversation(normalized_user_id)
         await self.store_message(normalized_user_id, message, "user", conversation_id)
         
         response = ""

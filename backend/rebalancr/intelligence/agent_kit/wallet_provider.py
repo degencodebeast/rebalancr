@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class PrivyProviderConfig(BaseModel):
     """Base configuration for Privy providers."""
     app_id: Optional[str] = Field(None, description="The Privy app ID")
-    api_key: Optional[str] = Field(None, description="The Privy API key")
+    #api_key: Optional[str] = Field(None, description="The Privy API key")
     app_secret: Optional[str] = Field(None, description="The Privy app secret")
 
 class PrivyWalletProviderConfig(PrivyProviderConfig):
@@ -58,7 +58,7 @@ class PrivyWalletProvider(EvmWalletProvider):
         if not config:
             config = PrivyWalletProviderConfig(
                 app_id=settings.PRIVY_APP_ID,
-                api_key=settings.PRIVY_API_KEY,
+                #api_key=settings.PRIVY_API_KEY,
                 network_id=settings.NETWORK_ID or "base-sepolia",
                 app_secret=settings.PRIVY_APP_SECRET,
                 gas=EvmGasConfig(
@@ -69,7 +69,7 @@ class PrivyWalletProvider(EvmWalletProvider):
         elif not isinstance(config, PrivyWalletProviderConfig):
             config = PrivyWalletProviderConfig(
                 app_id=getattr(config, "PRIVY_APP_ID", None),
-                api_key=getattr(config, "PRIVY_API_KEY", None),
+                app_secret=getattr(config, "PRIVY_APP_SECRET", None),
                 network_id=getattr(config, "NETWORK_ID", "base-sepolia"),
                 gas=EvmGasConfig(
                     gas_limit_multiplier=1.2,
@@ -78,8 +78,8 @@ class PrivyWalletProvider(EvmWalletProvider):
             )
         
         # Validate required credentials
-        if not config.app_id or not config.api_key:
-            raise ValueError("Missing Privy credentials. Set PRIVY_APP_ID and PRIVY_API_KEY in your environment.")
+        if not config.app_id or not config.app_secret:
+            raise ValueError("Missing Privy credentials. Set PRIVY_APP_ID and PRIVY_APP_SECRET in your environment.")
         
         self.config = config
         
@@ -89,10 +89,14 @@ class PrivyWalletProvider(EvmWalletProvider):
         os.makedirs(self.wallet_data_dir, exist_ok=True)
         
         # Get chain ID from network ID
-        chain_id = self._get_chain_id_from_network_id(config.network_id)
-        
+        #chain_id = self._get_chain_id_from_network_id(config.network_id)
+        chain_id =  "base_sepolia"
         # Setup Web3 connection with RPC URL
-        rpc_url = self._get_rpc_url_for_network(config.network_id)
+        #rpc_url = self._get_rpc_url_for_network(config.network_id)
+        rpc_url = "https://sepolia.base.org"
+
+        #chain_id = "monad_testnet"
+        #rpc_url = "https://testnet-rpc.monad.xyz"
         self._web3 = Web3(Web3.HTTPProvider(rpc_url))
         
         # Initialize network object (matches CDP wallet provider)
@@ -155,7 +159,8 @@ class PrivyWalletProvider(EvmWalletProvider):
             "base-sepolia": "https://sepolia.base.org", 
             "optimism": "https://mainnet.optimism.io",
             "arbitrum": "https://arb1.arbitrum.io/rpc",
-            "polygon": "https://polygon-rpc.com"
+            "polygon": "https://polygon-rpc.com",
+            "monad-testnet": "https://testnet-rpc.monad.xyz"
         }
         return rpc_map.get(network_id, rpc_map["ethereum"])
     
@@ -393,7 +398,7 @@ class PrivyWalletProvider(EvmWalletProvider):
         wallet_id = self._wallet_data.get('id')
         
         try:
-            url = f"{self.base_url}/wallets/{wallet_id}/sign"
+            url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
             payload = {
@@ -404,8 +409,13 @@ class PrivyWalletProvider(EvmWalletProvider):
             response = requests.post(url, headers=headers, json=payload)
             response.raise_for_status()
             result = response.json()
+
+            if "data" in result and "signature" in result["data"]:
+                return result["data"]["signature"]
+            else:
+                raise ValueError(f"Invalid response from Privy API: {result}")
             
-            return result.get("signature")
+            #return result.get("signature")
             
         except Exception as e:
             logger.error(f"Error signing typed data: {str(e)}")
@@ -417,18 +427,23 @@ class PrivyWalletProvider(EvmWalletProvider):
             raise ValueError("No wallet initialized. Call get_or_create_wallet first.")
         
         wallet_id = self._wallet_data.get('id')
-        
+        logger.info(f"Signing transaction for wallet {wallet_id}")
         # Prepare transaction
         prepared_tx = self._prepare_transaction(transaction)
+
+        # Generate idempotency key based on transaction params
+        idempotency_key = f"tx-{wallet_id}-{prepared_tx.get('nonce', '')}-{uuid.uuid4()}"
         
         try:
             url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
             payload = {
-                "chain_type": "ethereum",
-                "method": "eth_signTransaction",
-                "params": prepared_tx
+                "method": "eth_signTransaction",  
+                "params": {
+                    "transaction": prepared_tx 
+                },
+                "idempotency_key": idempotency_key
             }
             
             response = requests.post(url, headers=headers, json=payload)
@@ -438,22 +453,29 @@ class PrivyWalletProvider(EvmWalletProvider):
                 raise Exception(f"Error signing transaction: {response.status_code} {response.text}")
             
             result = response.json()
-            
+
+              
             # Check if response contains expected data
-            if "data" in result and "rawTransaction" in result["data"]:
-                # Create a SignedTransaction object
-                class PrivySignedTransaction:
-                    def __init__(self, raw_transaction):
-                        self.rawTransaction = raw_transaction
-                
-                # Convert hex string to bytes if needed
-                raw_tx = result["data"]["rawTransaction"]
-                if isinstance(raw_tx, str) and raw_tx.startswith("0x"):
-                    raw_tx = bytes.fromhex(raw_tx[2:])
-                    
-                return PrivySignedTransaction(raw_tx)
+            if "data" in result and "signature" in result["data"]:
+                return result["data"]["signature"]
             else:
-                raise ValueError(f"Invalid response from Privy API: {result}")
+                raise ValueError(f"Invalid response from Privy API: {result}")    
+            
+            # # Check if response contains expected data
+            # if "data" in result and "rawTransaction" in result["data"]:
+            #     # Create a SignedTransaction object
+            #     class PrivySignedTransaction:
+            #         def __init__(self, raw_transaction):
+            #             self.rawTransaction = raw_transaction
+                
+            #     # Convert hex string to bytes if needed
+            #     raw_tx = result["data"]["rawTransaction"]
+            #     if isinstance(raw_tx, str) and raw_tx.startswith("0x"):
+            #         raw_tx = bytes.fromhex(raw_tx[2:])
+                    
+            #     return PrivySignedTransaction(raw_tx)
+            # else:
+            #     raise ValueError(f"Invalid response from Privy API: {result}")
             
         except Exception as e:
             logger.error(f"Error signing transaction: {str(e)}")
@@ -476,10 +498,17 @@ class PrivyWalletProvider(EvmWalletProvider):
             url = f"{self.base_url}/wallets/{wallet_id}/rpc"
             headers = self._get_auth_headers()
             
+            # Get chain ID in CAIP2 format
+            chain_id = 84532  # Base Sepolia chain ID
+            caip2 = f"eip155:{chain_id}"
+            
+            # Format the payload according to Privy API requirements
             payload = {
-                "chain_type": "ethereum",
                 "method": "eth_sendTransaction",
-                "params": prepared_tx,
+                "caip2": caip2,  # Added the required caip2 field
+                "params": {
+                    "transaction": prepared_tx  # CHANGED: Nested under params.transaction
+                },
                 "idempotency_key": idempotency_key
             }
             
@@ -492,8 +521,13 @@ class PrivyWalletProvider(EvmWalletProvider):
             result = response.json()
             
             # Check if response contains expected data
-            if "data" in result and "transactionHash" in result["data"]:
-                return result["data"]["transactionHash"]
+            if "data" in result:
+                if "transactionHash" in result["data"]:
+                    return result["data"]["transactionHash"]
+                elif "hash" in result["data"]:
+                    return result["data"]["hash"]
+                else:
+                    raise ValueError(f"Transaction hash not found in Privy API response: {result}")
             else:
                 raise ValueError(f"Invalid response from Privy API: {result}")
             
@@ -609,7 +643,11 @@ class PrivyWalletProvider(EvmWalletProvider):
             prepared_tx['maxPriorityFeePerGas'] = max_priority_fee_per_gas
             prepared_tx['maxFeePerGas'] = max_fee_per_gas
             prepared_tx['type'] = 2  # Set transaction type to EIP-1559
-        
+
+        # Convert bytes to hex strings for JSON serialization
+        if 'data' in prepared_tx and isinstance(prepared_tx['data'], bytes):
+            prepared_tx['data'] = '0x' + prepared_tx['data'].hex()
+            
         return prepared_tx
     
     def _estimate_fees(self):
