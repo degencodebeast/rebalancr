@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import os
 from dotenv import load_dotenv
 
@@ -72,3 +72,113 @@ settings = Settings()
 
 def get_settings():
     return Settings()
+
+"""
+Rebalancr Configuration
+
+This module provides configuration options for the rebalancing system, 
+including integration with Allora, strategy parameters, and action providers.
+"""
+
+# Allora configuration
+ALLORA_BASE_URL = os.environ.get("ALLORA_BASE_URL", "https://api.allora.network")
+
+# Strategy configuration
+STRATEGY_CONFIG = {
+    # Minimum days between rebalancing as recommended by Rose Heart
+    "MIN_REBALANCE_DAYS": 7,
+    
+    # Fee rate for transaction cost calculation
+    "FEE_RATE": 0.001,  # 0.1%
+    
+    # Cost-benefit ratio threshold for rebalancing
+    # Potential benefit must exceed costs by at least this factor
+    "COST_BENEFIT_RATIO": 2.0,
+    
+    # Default asset weights for different risk profiles
+    "DEFAULT_WEIGHTS": {
+        "conservative": {"BTC": 0.2, "ETH": 0.2, "USDC": 0.6},
+        "balanced": {"BTC": 0.3, "ETH": 0.3, "USDC": 0.4},
+        "aggressive": {"BTC": 0.4, "ETH": 0.4, "USDC": 0.2}
+    },
+    
+    # Signal weights - initially equal as Rose Heart suggested
+    "SIGNAL_WEIGHTS": {
+        "sentiment": 0.25,
+        "below_median": 0.25,
+        "volatility": 0.25,
+        "trend": 0.25
+    },
+    
+    # Special asset configurations
+    "ASSET_CONFIG": {
+        "BTC": {
+            "sentiment_weight": 0.25,
+            "statistical_weight": 0.75,
+            "manipulation_threshold": 0.7
+        },
+        "ETH": {
+            "sentiment_weight": 0.25,
+            "statistical_weight": 0.75,
+            "manipulation_threshold": 0.7
+        },
+        "USDC": {
+            "sentiment_weight": 0.1,
+            "statistical_weight": 0.9,
+            "manipulation_threshold": 0.8
+        }
+    }
+}
+
+# Trade reviewer configuration
+REVIEWER_CONFIG = {
+    "USE_EXTERNAL_AI": os.environ.get("USE_EXTERNAL_AI", "false").lower() == "true",
+    "REVIEWER_API_KEY": os.environ.get("REVIEWER_API_KEY", ""),
+    "REVIEWER_API_URL": os.environ.get("REVIEWER_API_URL", "")
+}
+
+
+ALLORA_API_KEY: str = os.getenv("ALLORA_API_KEY")
+
+# Supported networks
+SUPPORTED_NETWORKS = [1, 56, 137, 42161, 10]  # Ethereum, BSC, Polygon, Arbitrum, Optimism
+
+# Network RPC URLs
+NETWORK_RPC_URLS = {
+    1: os.environ.get("ETH_RPC_URL", ""),
+    56: os.environ.get("BSC_RPC_URL", ""),
+    137: os.environ.get("POLYGON_RPC_URL", ""),
+    42161: os.environ.get("ARBITRUM_RPC_URL", ""),
+    10: os.environ.get("OPTIMISM_RPC_URL", "")
+}
+
+# Database configuration
+DATABASE_CONFIG = {
+    "URI": os.environ.get("DATABASE_URI", "sqlite:///rebalancr.db"),
+    "POOL_SIZE": int(os.environ.get("DB_POOL_SIZE", "10")),
+    "MAX_OVERFLOW": int(os.environ.get("DB_MAX_OVERFLOW", "20"))
+}
+
+def get_config() -> Dict[str, Any]:
+    """Get the full configuration"""
+    return {
+        "ALLORA_API_KEY": ALLORA_API_KEY,
+        "ALLORA_BASE_URL": ALLORA_BASE_URL,
+        "STRATEGY": STRATEGY_CONFIG,
+        "REVIEWER": REVIEWER_CONFIG,
+        "SUPPORTED_NETWORKS": SUPPORTED_NETWORKS,
+        "NETWORK_RPC_URLS": NETWORK_RPC_URLS,
+        "DATABASE": DATABASE_CONFIG
+    }
+
+def get_strategy_config() -> Dict[str, Any]:
+    """Get the strategy configuration"""
+    return STRATEGY_CONFIG
+
+def get_reviewer_config() -> Dict[str, Any]:
+    """Get the trade reviewer configuration"""
+    return REVIEWER_CONFIG
+
+def get_network_rpc_url(network_id: int) -> str:
+    """Get the RPC URL for a network"""
+    return NETWORK_RPC_URLS.get(network_id, "")

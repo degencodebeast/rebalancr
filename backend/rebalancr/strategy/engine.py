@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from .risk_manager import RiskManager
@@ -12,451 +12,388 @@ logger = logging.getLogger(__name__)
 
 class StrategyEngine:
     """
-    Strategy engine for portfolio optimization and rebalancing
-    
-    Note: This is a minimal implementation for testing the chat flow
+    Core strategy execution engine that implements rebalancing execution
+    based on decisions from the Intelligence Engine, focusing purely on
+    statistical analysis as recommended by Rose Heart.
     """
-    def __init__(self):
-        self.strategies = {
-            "conservative": {"ETH": 0.3, "USDC": 0.7},
-            "balanced": {"ETH": 0.5, "USDC": 0.5},
-            "aggressive": {"ETH": 0.7, "USDC": 0.3}
+    
+    def __init__(
+        self,
+        intelligence_engine: IntelligenceEngine,
+        risk_manager: RiskManager,
+        yield_optimizer: YieldOptimizer,
+        wormhole_service: WormholeService,
+        db_manager,
+        config: Dict[str, Any]
+    ):
+        self.intelligence_engine = intelligence_engine
+        self.risk_manager = risk_manager
+        self.yield_optimizer = yield_optimizer
+        self.wormhole_service = wormhole_service
+        self.db_manager = db_manager
+        self.config = config
+        
+        # Asset-specific profiles following Rose Heart's recommendation
+        self.asset_profiles = {
+            "BTC": {
+                "below_median_weight": 0.30,  # Higher weight due to BTC tendency to remain below median
+                "volatility_threshold": 0.18,  # Higher threshold for BTC
+                "manipulation_detection_threshold": 0.65,  # Lower threshold (established asset)
+                "min_allocation": 0.05,
+                "max_allocation": 0.30
+            },
+            "ETH": {
+                "below_median_weight": 0.20,
+                "volatility_threshold": 0.22,  # Higher threshold for ETH's volatility patterns
+                "manipulation_detection_threshold": 0.65,
+                "min_allocation": 0.05,
+                "max_allocation": 0.30
+            },
+            "USDC": {
+                "regulatory_risk_weight": 0.15,
+                "volatility_threshold": 0.01,
+                "manipulation_detection_threshold": 0.80,
+                "min_allocation": 0.10,
+                "max_allocation": 0.50
+            },
+            "USDT": {
+                "regulatory_risk_weight": 0.20,  # Higher regulatory risk than USDC
+                "volatility_threshold": 0.01,
+                "manipulation_detection_threshold": 0.80,
+                "min_allocation": 0.05,
+                "max_allocation": 0.40
+            },
+            "SOL": {
+                "below_median_weight": 0.15,
+                "volatility_threshold": 0.25,  # Higher volatility
+                "manipulation_detection_threshold": 0.70,
+                "min_allocation": 0.0,
+                "max_allocation": 0.20
+            },
+            # Default profile for other assets
+            "DEFAULT": {
+                "below_median_weight": 0.15,
+                "volatility_threshold": 0.20,
+                "manipulation_detection_threshold": 0.75,
+                "min_allocation": 0.0,
+                "max_allocation": 0.15
+            }
         }
     
-    async def analyze_portfolio(self, holdings):
-        """Analyze portfolio and provide insights"""
+    async def analyze_portfolio_statistics(self, portfolio_id: int) -> Dict[str, Any]:
+        """
+        Pure statistical analysis of portfolio without decision making.
+        This provides metrics for the Intelligence Engine to consume.
+        """
+        try:
+            # Get portfolio data
+            portfolio = await self.db_manager.get_portfolio(portfolio_id)
+            
+            # Get risk assessment - purely statistical as Rose Heart advised
+            risk_assessment = await self.risk_manager.assess_portfolio_risk(portfolio_id)
+            
+            # Calculate asset metrics
+            asset_metrics = await self._calculate_asset_metrics(portfolio)
+            
+            # Calculate portfolio metrics
+            portfolio_metrics = {
+                "portfolio_id": portfolio_id,
+                "total_value": portfolio.get("total_value", 0),
+                "risk_level": risk_assessment.get("risk_level", "moderate"),
+                "volatility": risk_assessment.get("volatility", 0),
+                "sharpe_ratio": risk_assessment.get("sharpe_ratio", 0),
+                "drawdown": risk_assessment.get("max_drawdown", 0),
+                "asset_metrics": asset_metrics
+            }
+            
+            # Check circuit breakers
+            circuit_breakers = self._check_circuit_breakers(portfolio_metrics)
+            portfolio_metrics["circuit_breakers"] = circuit_breakers
+            
+            return portfolio_metrics
+        except Exception as e:
+            logger.error(f"Error analyzing portfolio statistics: {str(e)}")
+            return {
+                "portfolio_id": portfolio_id,
+                "error": str(e),
+                "message": "Error analyzing portfolio statistics"
+            }
+    
+    async def execute_rebalance(self, user_id: str, portfolio_id: int, recommendation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute portfolio rebalancing based on recommendations from Intelligence Engine.
+        This focuses purely on execution, not decision making.
+        """
+        try:
+            # Validate recommendation
+            if not recommendation.get("rebalance_recommended", False):
+                return {
+                    "portfolio_id": portfolio_id,
+                    "success": False,
+                    "message": "Rebalancing not recommended",
+                    "reason": recommendation.get("reason", "Unknown")
+                }
+            
+            # Check circuit breakers
+            portfolio_stats = await self.analyze_portfolio_statistics(portfolio_id)
+            if portfolio_stats.get("circuit_breakers", {}).get("active", False):
+                return {
+                    "portfolio_id": portfolio_id,
+                    "success": False,
+                    "message": "Rebalancing paused",
+                    "reason": portfolio_stats["circuit_breakers"].get("reason", "Circuit breaker active")
+                }
+            
+            # Get target allocations from recommendation
+            target_allocations = recommendation.get("target_allocations", {})
+            
+            # Get current portfolio 
+            portfolio = await self.db_manager.get_portfolio(portfolio_id)
+            
+            # Calculate required trades
+            trades = await self._calculate_required_trades(portfolio, target_allocations)
+            
+            # Execute trades
+            executed_trades = await self._execute_trades(trades)
+            
+            # Update portfolio in database
+            await self.db_manager.update_portfolio_after_rebalance(
+                portfolio_id, 
+                executed_trades, 
+                target_allocations
+            )
+            
+            return {
+                "portfolio_id": portfolio_id,
+                "success": True,
+                "message": "Portfolio rebalanced successfully",
+                "trades_executed": executed_trades,
+                "new_allocations": target_allocations
+            }
+        except Exception as e:
+            logger.error(f"Error executing rebalance: {str(e)}")
+            return {
+                "portfolio_id": portfolio_id,
+                "success": False,
+                "error": str(e),
+                "message": "Error executing rebalance"
+            }
+    
+    async def calculate_rebalancing_costs(self, portfolio) -> Dict[str, float]:
+        """
+        Calculate costs of rebalancing (transaction fees, slippage, etc.)
+        This is used by the Intelligence Engine for cost-benefit analysis.
+        """
+        # Simplified implementation
+        assets = portfolio.get("assets", [])
+        total_value = sum(asset.get("value", 0) for asset in assets)
+        
+        # Estimate trading fees as 0.1% of total portfolio value
+        trading_fees = total_value * 0.001
+        
+        # Estimate gas fees for cross-chain operations
+        gas_fees = 10  # Fixed amount in USD
+        
+        # Estimate slippage based on asset liquidity and trade size
+        slippage_cost = total_value * 0.001  # 0.1% slippage
+        
         return {
-            "total_value": sum(holding["value"] for holding in holdings),
-            "asset_allocation": {h["asset"]: h["value"] for h in holdings},
-            "risk_score": 65,  # Placeholder
-            "recommendations": ["Consider rebalancing to reduce ETH exposure"]
+            "trading_fees": trading_fees,
+            "gas_fees": gas_fees,
+            "slippage_cost": slippage_cost,
+            "total_cost": trading_fees + gas_fees + slippage_cost
         }
     
-    async def get_recommended_allocation(self, risk_profile="balanced"):
-        """Get recommended asset allocation based on risk profile"""
-        return self.strategies.get(risk_profile, self.strategies["balanced"])
-
-# class StrategyEngine:
-#     """
-#     Core strategy execution engine that implements rebalancing using both AI 
-#     insights and statistical analysis, following Rose Heart's dual approach.
-#     """
+    async def _calculate_asset_metrics(self, portfolio) -> Dict[str, Any]:
+        """Calculate statistical metrics for each asset in the portfolio"""
+        asset_metrics = {}
+        
+        for asset in portfolio.get("assets", []):
+            symbol = asset.get("symbol")
+            
+            # Get asset profile or use default
+            profile = self.asset_profiles.get(symbol, self.asset_profiles["DEFAULT"])
+            
+            # Get historical data
+            historical_data = await self.db_manager.get_asset_historical_data(symbol)
+            
+            # Calculate trend
+            trend = self._analyze_price_trend(symbol, historical_data)
+            
+            # Calculate volatility
+            volatility = self._calculate_asset_volatility(historical_data)
+            
+            # Calculate below median metric
+            below_median = self._calculate_below_median(historical_data)
+            
+            asset_metrics[symbol] = {
+                "trend": trend,
+                "volatility": volatility,
+                "below_median": below_median,
+                "profile": profile
+            }
+        
+        return asset_metrics
     
-#     def __init__(
-#         self,
-#         intelligence_engine: IntelligenceEngine,
-#         risk_manager: RiskManager,
-#         yield_optimizer: YieldOptimizer,
-#         wormhole_service: WormholeService,
-#         db_manager,
-#         config: Dict[str, Any]
-#     ):
-#         self.intelligence_engine = intelligence_engine
-#         self.risk_manager = risk_manager
-#         self.yield_optimizer = yield_optimizer
-#         self.wormhole_service = wormhole_service
-#         self.db_manager = db_manager
-#         self.config = config
+    def _analyze_price_trend(self, symbol: str, historical_data: List[Dict[str, Any]], window: int = 24) -> str:
+        """
+        Analyze recent price trend similar to AutoTradeBot
+        Returns: "UP", "DOWN", or "SIDEWAYS"
+        """
+        if not historical_data or len(historical_data) < window:
+            return "SIDEWAYS"
+            
+        recent_prices = [point.get("price", 0) for point in historical_data[-window:]]
+        if not recent_prices or len(recent_prices) < 2:
+            return "SIDEWAYS"
+            
+        price_change = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
         
-#     async def analyze_rebalance_opportunity(self, user_id: str, portfolio_id: int) -> Dict[str, Any]:
-#         """
-#         Analyze if rebalancing is beneficial, considering fees and potential gains.
-        
-#         Implements Rose Heart's advice about avoiding too frequent rebalancing
-#         and ensuring the benefits outweigh the costs.
-#         """
-#         try:
-#             # Get portfolio data
-#             portfolio = await self.db_manager.get_portfolio(portfolio_id)
-            
-#             # Check last rebalance date - Rose Heart advised against frequent rebalancing
-#             last_rebalance = portfolio.get("last_rebalance_timestamp")
-#             if last_rebalance:
-#                 last_rebalance_date = datetime.fromisoformat(last_rebalance)
-#                 days_since_rebalance = (datetime.now() - last_rebalance_date).days
-#                 if days_since_rebalance < self.config.get("MIN_REBALANCE_DAYS", 7):
-#                     return {
-#                         "portfolio_id": portfolio_id,
-#                         "rebalance_recommended": False,
-#                         "reason": f"Last rebalance was only {days_since_rebalance} days ago",
-#                         "message": "Too frequent rebalancing incurs unnecessary fees."
-#                     }
-            
-#             # Get intelligence insights - combining AI sentiment and statistical analysis
-#             intelligence_insights = await self.intelligence_engine.analyze_portfolio(user_id, portfolio_id)
-            
-#             # Get risk assessment - purely statistical as Rose Heart advised
-#             risk_assessment = await self.risk_manager.assess_portfolio_risk(portfolio_id)
-            
-#             # Get yield opportunities
-#             yield_opportunities = await self.yield_optimizer.find_opportunities(portfolio_id)
-            
-#             # Calculate rebalancing costs
-#             rebalancing_costs = await self._calculate_rebalancing_costs(portfolio)
-            
-#             # Calculate potential benefits
-#             potential_benefits = await self._calculate_potential_benefits(
-#                 portfolio, 
-#                 intelligence_insights,
-#                 yield_opportunities
-#             )
-            
-#             # Rose Heart's key advice: only rebalance if benefits outweigh costs
-#             rebalance_recommended = potential_benefits > rebalancing_costs
-            
-#             return {
-#                 "portfolio_id": portfolio_id,
-#                 "rebalance_recommended": rebalance_recommended,
-#                 "potential_benefits": potential_benefits,
-#                 "rebalancing_costs": rebalancing_costs,
-#                 "risk_assessment": risk_assessment,
-#                 "intelligence_insights": intelligence_insights,
-#                 "yield_opportunities": yield_opportunities,
-#                 "reason": "Benefits outweigh costs" if rebalance_recommended else "Costs outweigh benefits",
-#                 "message": "Rebalancing recommended" if rebalance_recommended else "Hold current positions"
-#             }
-#         except Exception as e:
-#             logger.error(f"Error analyzing rebalance opportunity: {str(e)}")
-#             return {
-#                 "portfolio_id": portfolio_id,
-#                 "rebalance_recommended": False,
-#                 "error": str(e),
-#                 "message": "Error analyzing rebalance opportunity"
-#             }
-            
-#     async def execute_rebalance(self, user_id: str, portfolio_id: int) -> Dict[str, Any]:
-#         """Execute portfolio rebalancing"""
-#         try:
-#             # First analyze if rebalancing is beneficial
-#             analysis = await self.analyze_rebalance_opportunity(user_id, portfolio_id)
-            
-#             if not analysis.get("rebalance_recommended", False):
-#                 return {
-#                     "portfolio_id": portfolio_id,
-#                     "success": False,
-#                     "message": "Rebalancing not recommended",
-#                     "reason": analysis.get("reason", "Unknown")
-#                 }
-            
-#             # Get target allocations - combining AI and statistical methods
-#             # per Rose Heart's dual-system approach
-#             target_allocations = await self._calculate_target_allocations(
-#                 portfolio_id, 
-#                 analysis["intelligence_insights"],
-#                 analysis["risk_assessment"]
-#             )
-            
-#             # Get current portfolio 
-#             portfolio = await self.db_manager.get_portfolio(portfolio_id)
-            
-#             # Calculate required trades
-#             trades = await self._calculate_required_trades(portfolio, target_allocations)
-            
-#             # Execute trades (would be implemented with actual exchange APIs)
-#             # Here we just simulate successful execution
-#             executed_trades = await self._execute_trades(trades)
-            
-#             # Update portfolio in database
-#             await self.db_manager.update_portfolio_after_rebalance(
-#                 portfolio_id, 
-#                 executed_trades, 
-#                 target_allocations
-#             )
-            
-#             return {
-#                 "portfolio_id": portfolio_id,
-#                 "success": True,
-#                 "message": "Portfolio rebalanced successfully",
-#                 "trades_executed": executed_trades,
-#                 "new_allocations": target_allocations
-#             }
-#         except Exception as e:
-#             logger.error(f"Error executing rebalance: {str(e)}")
-#             return {
-#                 "portfolio_id": portfolio_id,
-#                 "success": False,
-#                 "error": str(e),
-#                 "message": "Error executing rebalance"
-#             }
+        if abs(price_change) < 0.01:  # Less than 1% change
+            return "SIDEWAYS"
+        return "UP" if price_change > 0 else "DOWN"
     
-#     async def _calculate_rebalancing_costs(self, portfolio) -> float:
-#         """Calculate costs of rebalancing (transaction fees, slippage, etc.)"""
-#         # Simplified implementation
-#         assets = portfolio.get("assets", [])
-#         total_value = sum(asset.get("value", 0) for asset in assets)
+    def _calculate_asset_volatility(self, historical_data: List[Dict[str, Any]], window: int = 30) -> float:
+        """Calculate volatility for an asset using standard deviation of returns"""
+        if not historical_data or len(historical_data) < window:
+            return 0.0
+            
+        prices = [point.get("price", 0) for point in historical_data[-window:]]
+        if not prices or len(prices) < 2:
+            return 0.0
+            
+        # Calculate daily returns
+        returns = [(prices[i] / prices[i-1]) - 1 for i in range(1, len(prices))]
         
-#         # Estimate trading fees as 0.1% of total portfolio value
-#         trading_fees = total_value * 0.001
+        # Calculate standard deviation
+        mean_return = sum(returns) / len(returns)
+        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
         
-#         # Estimate gas fees for cross-chain operations
-#         gas_fees = 10  # Fixed amount in USD
-        
-#         # Estimate slippage based on asset liquidity and trade size
-#         slippage_cost = total_value * 0.001  # 0.1% slippage
-        
-#         return trading_fees + gas_fees + slippage_cost
+        return (variance ** 0.5) * (252 ** 0.5)  # Annualized volatility
     
-#     async def _calculate_potential_benefits(
-#         self, 
-#         portfolio, 
-#         intelligence_insights,
-#         yield_opportunities
-#     ) -> float:
-#         """
-#         Calculate potential benefits of rebalancing
-        
-#         Following Rose Heart's advice, this uses statistical methods for numerical computations
-#         """
-#         # Simplified implementation
-#         potential_yield_increase = sum(opp.get("additional_yield", 0) for opp in yield_opportunities)
-        
-#         # Calculate potential risk reduction
-#         current_allocations = {asset["symbol"]: asset["percentage"] / 100 
-#                               for asset in portfolio.get("assets", [])}
-        
-#         recommended_changes = intelligence_insights.get("assets", [])
-#         potential_improvement = 0
-        
-#         for change in recommended_changes:
-#             asset = change.get("asset")
-#             action = change.get("recommended_action")
+    def _calculate_below_median(self, historical_data: List[Dict[str, Any]], window: int = 60) -> float:
+        """
+        Calculate how often price stays below median
+        This is important for BTC as Rose Heart mentioned it tends to stay below median
+        """
+        if not historical_data or len(historical_data) < window:
+            return 0.5  # Default 50%
             
-#             # Skip assets with "maintain" recommendation
-#             if action == "maintain":
-#                 continue
+        prices = [point.get("price", 0) for point in historical_data[-window:]]
+        if not prices:
+            return 0.5
             
-#             current_allocation = current_allocations.get(asset, 0)
-            
-#             # Add potential improvement based on confidence and current allocation
-#             confidence = change.get("confidence", 0) / 100
-#             if action == "increase" and current_allocation < 0.4:
-#                 potential_improvement += confidence * 0.01 * portfolio.get("total_value", 0)
-#             elif action == "decrease" and current_allocation > 0.1:
-#                 potential_improvement += confidence * 0.01 * portfolio.get("total_value", 0)
+        median_price = sorted(prices)[len(prices) // 2]
+        below_count = sum(1 for price in prices if price < median_price)
         
-#         return potential_yield_increase + potential_improvement
+        return below_count / len(prices)
     
-#     async def _calculate_target_allocations(
-#         self,
-#         portfolio_id, 
-#         intelligence_insights,
-#         risk_assessment
-#     ) -> Dict[str, float]:
-#         """
-#         Calculate target allocations for portfolio
+    def _check_circuit_breakers(self, portfolio_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Implement circuit breakers to pause rebalancing during extreme market conditions
+        as recommended by Rose Heart
+        """
+        # Check for extreme market volatility
+        if portfolio_metrics.get("volatility", 0) > self.config.get("EXTREME_VOLATILITY_THRESHOLD", 0.05):
+            return {
+                "active": True,
+                "reason": f"Extreme portfolio volatility detected: {portfolio_metrics['volatility']:.2%}"
+            }
         
-#         Implements Rose Heart's dual approach - combining AI sentiment
-#         and statistical analysis with equal weights
-#         """
-#         # Get current allocations
-#         portfolio = await self.db_manager.get_portfolio(portfolio_id)
-#         assets = portfolio.get("assets", [])
-#         current_allocations = {asset["symbol"]: asset["percentage"] / 100 for asset in assets}
+        # Check for excessive drawdown
+        if portfolio_metrics.get("drawdown", 0) > self.config.get("EXTREME_DRAWDOWN_THRESHOLD", 0.15):
+            return {
+                "active": True,
+                "reason": f"Excessive drawdown detected: {portfolio_metrics['drawdown']:.2%}"
+            }
         
-#         # Get recommended changes from intelligence insights
-#         asset_insights = {insight["asset"]: insight for insight in intelligence_insights.get("assets", [])}
+        # Check asset-specific circuit breakers
+        for symbol, metrics in portfolio_metrics.get("asset_metrics", {}).items():
+            profile = metrics.get("profile", {})
+            volatility_threshold = profile.get("volatility_threshold", 0.20)
+            
+            if metrics.get("volatility", 0) > volatility_threshold:
+                return {
+                    "active": True,
+                    "reason": f"Extreme volatility detected for {symbol}: {metrics['volatility']:.2%}"
+                }
         
-#         # Calculate target allocations
-#         target_allocations = current_allocations.copy()
+        return {
+            "active": False,
+            "reason": None
+        }
+    
+    async def _calculate_required_trades(self, portfolio: Dict[str, Any], target_allocations: Dict[str, float]) -> List[Dict[str, Any]]:
+        """
+        Calculate required trades to achieve target allocations
+        Implementing Rose Heart's 5% minimum deviation threshold
+        """
+        trades = []
         
-#         for symbol, allocation in current_allocations.items():
-#             if symbol in asset_insights:
-#                 insight = asset_insights[symbol]
-#                 action = insight.get("recommended_action")
-#                 confidence = insight.get("confidence", 0) / 100
+        assets = portfolio.get("assets", [])
+        total_value = portfolio.get("total_value", 0)
+        
+        if not total_value or not assets:
+            return []
+        
+        current_allocations = {
+            asset["symbol"]: asset["value"] / total_value
+            for asset in assets
+        }
+        
+        for symbol, target_allocation in target_allocations.items():
+            current_allocation = current_allocations.get(symbol, 0)
+            
+            # Calculate absolute deviation as percentage of portfolio
+            deviation = abs(target_allocation - current_allocation)
+            
+            # Only rebalance if deviation exceeds threshold (Rose Heart recommended 5%)
+            if deviation > self.config.get("MIN_REBALANCE_THRESHOLD", 0.05):
+                # Find asset in portfolio
+                asset = next((a for a in assets if a["symbol"] == symbol), None)
                 
-#                 # Apply changes based on recommendations
-#                 if action == "increase":
-#                     # Increase allocation by up to 20% based on confidence
-#                     target_allocations[symbol] = min(0.4, allocation * (1 + (0.2 * confidence)))
-#                 elif action == "decrease":
-#                     # Decrease allocation by up to 20% based on confidence
-#                     target_allocations[symbol] = max(0.05, allocation * (1 - (0.2 * confidence)))
+                current_value = asset["value"] if asset else 0
+                target_value = total_value * target_allocation
+                trade_value = target_value - current_value
+                
+                trades.append({
+                    "symbol": symbol,
+                    "action": "buy" if trade_value > 0 else "sell",
+                    "current_value": current_value,
+                    "target_value": target_value,
+                    "trade_value": abs(trade_value),
+                    "current_allocation": current_allocation,
+                    "target_allocation": target_allocation,
+                    "deviation": deviation
+                })
         
-#         # Ensure minimum allocation for stablecoins as Rose Heart advised
-#         stablecoins = ["USDC", "USDT", "DAI"]
-#         stablecoin_allocation = sum(target_allocations.get(coin, 0) for coin in stablecoins)
-        
-#         if stablecoin_allocation < 0.2:
-#             # Increase stablecoin allocation to minimum 20%
-#             deficit = 0.2 - stablecoin_allocation
-            
-#             # Reduce other assets proportionally
-#             non_stables = [symbol for symbol in target_allocations if symbol not in stablecoins]
-#             total_non_stable = sum(target_allocations[symbol] for symbol in non_stables)
-            
-#             for symbol in non_stables:
-#                 reduction_ratio = target_allocations[symbol] / total_non_stable
-#                 target_allocations[symbol] -= deficit * reduction_ratio
-            
-#             # Distribute to stablecoins
-#             for coin in stablecoins:
-#                 if coin in target_allocations:
-#                     target_allocations[coin] += deficit / len([c for c in stablecoins if c in target_allocations])
-        
-#         # Normalize to sum to 1.0
-#         total = sum(target_allocations.values())
-#         if total > 0:
-#             target_allocations = {k: v / total for k, v in target_allocations.items()}
-        
-#         return target_allocations
+        return trades
     
-#     async def _calculate_required_trades(self, portfolio, target_allocations):
-#         """Calculate required trades to achieve target allocations"""
-#         assets = portfolio.get("assets", [])
-#         total_value = sum(asset.get("value", 0) for asset in assets)
+    async def _execute_trades(self, trades: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Execute required trades
+        This would integrate with actual exchange APIs in production
+        """
+        # Placeholder implementation - in production, would connect to exchanges
+        executed_trades = []
         
-#         trades = []
-#         for asset in assets:
-#             symbol = asset["symbol"]
-#             current_value = asset["value"]
-#             current_amount = asset["amount"]
-#             current_allocation = current_value / total_value
+        for trade in trades:
+            # Simulate successful execution
+            executed_trade = {
+                **trade,
+                "status": "executed",
+                "execution_price": None,  # Would come from exchange
+                "timestamp": datetime.now().isoformat(),
+                "transaction_id": f"sim_{trade['symbol']}_{int(datetime.now().timestamp())}"
+            }
             
-#             target_allocation = target_allocations.get(symbol, 0)
-#             target_value = total_value * target_allocation
-            
-#             # Only trade if difference is significant (>1%)
-#             if abs(target_value - current_value) / total_value > 0.01:
-#                 price = current_value / current_amount if current_amount > 0 else 0
-#                 if price > 0:
-#                     trade_amount = (target_value - current_value) / price
-#                     trades.append({
-#                         "symbol": symbol,
-#                         "action": "buy" if trade_amount > 0 else "sell",
-#                         "amount": abs(trade_amount),
-#                         "estimated_value": abs(target_value - current_value)
-#                     })
+            executed_trades.append(executed_trade)
+            logger.info(f"Executed trade: {trade['action']} {trade['symbol']} worth ${trade['trade_value']:.2f}")
         
-#         return trades
+        return executed_trades
     
-#     async def _execute_trades(self, trades):
-#         """Execute calculated trades"""
-#         # This would integrate with actual exchange APIs
-#         # For now, simulate successful execution
-#         executed_trades = []
-#         for trade in trades:
-#             # Simulate execution with slight slippage
-#             executed_amount = trade["amount"] * (0.995 if trade["action"] == "buy" else 1.005)
-#             executed_trades.append({
-#                 "symbol": trade["symbol"],
-#                 "action": trade["action"],
-#                 "requested_amount": trade["amount"],
-#                 "executed_amount": executed_amount,
-#                 "timestamp": datetime.now().isoformat(),
-#                 "status": "completed"
-#             })
-        
-#         return executed_trades
-
-#     async def _calculate_target_allocations(self, portfolio, risk_profile):
-#         """Calculate target allocations using both analysis methods"""
-#         assets = portfolio.get("assets", [])
-        
-#         # Get current allocations
-#         current_allocations = {asset["symbol"]: asset["percentage"] / 100 for asset in assets}
-        
-#         # Start with current allocations
-#         target_allocations = current_allocations.copy()
-        
-#         # Get market metrics for all assets
-#         market_metrics = {}
-#         for asset in assets:
-#             symbol = asset["symbol"]
-#             metrics = await self.intelligence_engine.market_monitor.get_market_metrics(symbol)
-#             market_metrics[symbol] = metrics
-        
-#         # Adjust allocations based on predictions and sentiment
-#         for symbol, metrics in market_metrics.items():
-#             # Skip if no metrics available
-#             if not metrics:
-#                 continue
-            
-#             # Following Rose Heart's advice:
-#             # 1. Use AI predictions for directional signals
-#             # 2. Use statistical metrics for allocation sizing
-            
-#             # Get predictions
-#             predictions = metrics.get("predictions", {})
-#             short_term = predictions.get("short_term", {})
-#             medium_term = predictions.get("medium_term", {})
-#             long_term = predictions.get("long_term", {})
-            
-#             # Calculate prediction signal (-1 to 1)
-#             prediction_signals = []
-            
-#             if short_term:
-#                 # Weight: 20%
-#                 signal = 1 if short_term.get("direction") == "up" else -1
-#                 confidence = short_term.get("confidence", 0.5)
-#                 prediction_signals.append(signal * confidence * 0.2)
-            
-#             if medium_term:
-#                 # Weight: 30%
-#                 signal = 1 if medium_term.get("direction") == "up" else -1
-#                 confidence = medium_term.get("confidence", 0.5)
-#                 prediction_signals.append(signal * confidence * 0.3)
-            
-#             if long_term:
-#                 # Weight: 50%
-#                 signal = 1 if long_term.get("direction") == "up" else -1
-#                 confidence = long_term.get("confidence", 0.5)
-#                 prediction_signals.append(signal * confidence * 0.5)
-            
-#             # Calculate combined signal
-#             if prediction_signals:
-#                 prediction_signal = sum(prediction_signals)
-#             else:
-#                 prediction_signal = 0
-            
-#             # Get sentiment signals
-#             sentiment = metrics.get("sentiment", "neutral")
-#             fear_score = metrics.get("fear_score", 0.5)
-#             greed_score = metrics.get("greed_score", 0.5)
-            
-#             # Calculate sentiment signal (-1 to 1)
-#             sentiment_signal = 0
-#             if sentiment == "fear" and fear_score > 0.6:
-#                 # Contrarian approach: buy on fear
-#                 sentiment_signal = 0.5 * fear_score
-#             elif sentiment == "greed" and greed_score > 0.6:
-#                 # Contrarian approach: sell on greed
-#                 sentiment_signal = -0.5 * greed_score
-            
-#             # Get statistical metrics
-#             volatility = metrics.get("volatility", 0.5)
-#             below_median = metrics.get("below_median_frequency", 0.5)
-            
-#             # Calculate statistical signal (-1 to 1)
-#             stat_signal = 0
-#             if below_median > 0.7:
-#                 # Higher probability of upward mean reversion
-#                 stat_signal = 0.5
-#             elif below_median < 0.3:
-#                 # Higher probability of downward mean reversion
-#                 stat_signal = -0.5
-            
-#             # Combine signals using Rose Heart's recommendation of equal weights
-#             combined_signal = (prediction_signal + sentiment_signal + stat_signal) / 3
-            
-#             # Adjust allocation based on combined signal
-#             current_alloc = target_allocations.get(symbol, 0)
-#             adjustment = combined_signal * 0.1  # Max 10% adjustment
-            
-#             # Apply adjustment
-#             new_allocation = current_alloc * (1 + adjustment)
-            
-#             # Adjust for risk based on volatility
-#             if volatility > 0.5:  # High volatility
-#                 # Reduce allocation for high volatility assets
-#                 risk_factor = 1 - ((volatility - 0.5) / 0.5) * 0.3  # Max 30% reduction
-#                 new_allocation *= max(0.7, risk_factor)
-            
-#             target_allocations[symbol] = new_allocation
-        
-#         # Normalize allocations to sum to 1
-#         total = sum(target_allocations.values())
-#         if total > 0:
-#             target_allocations = {k: v / total for k, v in target_allocations.items()}
-        
-#         return target_allocations
+    async def record_trade_performance(self, portfolio_id: int, trades: List[Dict[str, Any]]) -> None:
+        """Record trade performance for future analysis"""
+        # This would be implemented in production to record trade outcomes
+        # for performance analysis and weights adjustment
+        pass

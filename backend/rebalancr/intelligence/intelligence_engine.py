@@ -7,6 +7,8 @@ import pandas as pd
 from rebalancr.intelligence.agent_kit.service import AgentKitService
 
 from .allora.client import AlloraClient
+from .allora.models import SentimentAnalysis, FearGreedIndex, MarketManipulation, RebalanceSignal, AssetAnalysisResult
+from .allora.config import get_asset_profile, AlloraConfig
 from .market_analysis import MarketAnalyzer
 from .agent_kit.client import AgentKitClient
 from .market_data import MarketDataAnalyzer
@@ -51,6 +53,9 @@ class IntelligenceEngine:
             "trend": 0.25
         }
 
+        # Performance tracking for self-improvement
+        self.performance_history = {}
+
     #            # Weights for different signals (statistical vs AI)
     #     # Starting with equal weights as Rose Heart suggested
     #     self.signal_weights = {
@@ -68,225 +73,258 @@ class IntelligenceEngine:
     # ) -> Dict[str, Any]:
     
     async def analyze_portfolio(self, user_id: str, portfolio_id: int) -> Dict[str, Any]:
-        # Generate portfolio recommendations using both AI and statistical methods
         """
         Analyze portfolio and determine if rebalancing is needed
         
         Implements the dual approach from Rose Heart:
-        1. AI sentiment analysis for each asset
-        2. Statistical analysis for each asset
-        3. Combined with equal weights initially
+        - AI for sentiment analysis (Allora)
+        - Statistical methods for numerical analysis
         """
-    #             # 1. Get Allora predictions for relevant assets
-    #     allora_predictions = {}
-    #     for asset, topic_id in self.topic_mappings.items():
-    #         if asset in portfolio:
-    #             try:
-    #                 prediction = await self.allora_client.get_prediction(topic_id)
-    #                 allora_predictions[asset] = prediction
-    #             except Exception as e:
-    #                 logger.error(f"Failed to get Allora prediction for {asset}: {e}")
-        
-    #     # 2. Perform statistical analysis
-    #     asset_metrics = {}
-    #     for asset in portfolio:
-    #         if asset in historical_data:
-    #             metrics = self.market_analyzer.calculate_asset_metrics(
-    #                 historical_data[asset]
-    #             )
-    #             asset_metrics[asset] = metrics
-        
-    #     # 3. Calculate target weights using both inputs
-    #     target_weights = self._calculate_target_weights(
-    #         portfolio, 
-    #         allora_predictions, 
-    #         asset_metrics
-    #     )
-        
-    #     # 4. Analyze rebalance opportunity
-    #     rebalance_analysis = self.market_analyzer.analyze_rebalance_opportunity(
-    #         portfolio,
-    #         target_weights,
-    #         current_prices,
-    #         fee_rate=self.config.get("fee_rate", 0.001)
-    #     )
-        
-    #     return {
-    #         "target_weights": target_weights,
-    #         "rebalance_analysis": rebalance_analysis,
-    #         "allora_signals": allora_predictions,
-    #         "statistical_signals": asset_metrics
-    #     }
-        
-    # def _calculate_target_weights(
-    #     self,
-    #     portfolio: Dict[str, float],
-    #     allora_predictions: Dict[str, Any],
-    #     asset_metrics: Dict[str, Dict[str, float]]
-    # ) -> Dict[str, float]:
-    #     """
-    #     Calculate target weights using both AI and statistical signals
-    #     """
-    #     # Implementation would combine signals with their respective weights
-    #     # This is a simplified example
-    #     assets = list(portfolio.keys())
-    #     initial_weights = {asset: 1.0 / len(assets) for asset in assets}
-        
-    #     # Adjust weights based on signals
-    #     adjusted_weights = initial_weights.copy()
-        
-    #     # Apply adjustments based on Allora predictions
-    #     for asset in assets:
-    #         if asset in allora_predictions:
-    #             prediction = allora_predictions[asset]
-    #             # Example: If prediction is bullish, increase weight
-    #             if prediction.get("signal") == "bullish":
-    #                 adjusted_weights[asset] *= 1.2
-    #             elif prediction.get("signal") == "bearish":
-    #                 adjusted_weights[asset] *= 0.8
-        
-    #     # Apply adjustments based on statistical metrics
-    #     for asset in assets:
-    #         if asset in asset_metrics:
-    #             metrics = asset_metrics[asset]
-    #             # Example: Adjust based on volatility
-    #             volatility = metrics.get("volatility", 0.5)
-    #             # Lower weight for higher volatility assets
-    #             volatility_factor = 1.0 - ((volatility - 0.2) / 0.8)
-    #             adjusted_weights[asset] *= max(0.5, min(1.5, volatility_factor))
-        
-    #     # Normalize weights to sum to 1.0
-    #     total_weight = sum(adjusted_weights.values())
-    #     normalized_weights = {
-    #         asset: weight / total_weight for asset, weight in adjusted_weights.items()
-    #     }
-        
-    #     return normalized_weights
-
         try:
             # Get portfolio data
-            portfolio = await self.get_portfolio(user_id, portfolio_id)
-            assets = portfolio.get("assets", [])
+            portfolio = await self.db_manager.get_portfolio(portfolio_id)
             
-            # Rose Heart advised against rebalancing too frequently
-            last_rebalance = portfolio.get("last_rebalance_timestamp")
-            if last_rebalance:
-                last_rebalance_date = datetime.fromisoformat(last_rebalance)
-                days_since_rebalance = (datetime.now() - last_rebalance_date).days
-                if days_since_rebalance < self.config.get("MIN_REBALANCE_DAYS", 7):
-                    return {
-                        "portfolio_id": portfolio_id,
-                        "rebalance_needed": False,
-                        "reason": f"Last rebalance was only {days_since_rebalance} days ago",
-                        "message": "Too frequent rebalancing incurs unnecessary fees."
-                    }
+            # Get statistical metrics from Strategy Engine
+            stats = await self.strategy_engine.analyze_portfolio_statistics(portfolio_id)
             
-            # Get market data for all assets
-            market_data = await self.market_data_service.get_data_for_assets(
-                [asset["symbol"] for asset in assets]
+            # Get sentiment analysis from Allora
+            sentiment_analysis = await self.allora_client.analyze_sentiment(
+                assets=[asset["symbol"] for asset in portfolio.get("assets", [])]
             )
             
-            # Process each asset
-            results = []
-            for asset in assets:
-                symbol = asset["symbol"]
-                
-                # 1. Get AI sentiment analysis (fear/greed)
-                # Rose Heart advised to focus AI only on sentiment
-                sentiment_data = await self.allora_client.analyze_sentiment(
-                    symbol, 
-                    await self.market_data_service.get_social_content(symbol)
-                )
-                
-                # 2. Get statistical analysis
-                # Rose Heart advised to use traditional statistics for numbers
-                stats_data = await self.market_analyzer.analyze_asset(
-                    symbol,
-                    market_data.get(symbol, pd.DataFrame())
-                )
-                
-                # 3. Combine results with equal weights
-                # Start with equal weights as Rose Heart suggested
-                combined_score = 0.0
-                
-                # Sentiment contribution
-                if sentiment_data.get("primary_emotion") == "greed":
-                    combined_score += self.weights["sentiment"]
-                elif sentiment_data.get("primary_emotion") == "fear":
-                    combined_score -= self.weights["sentiment"]
-                    
-                # Below median frequency contribution
-                below_median = stats_data.get("below_median_frequency", 0.5)
-                if below_median < 0.4:  # Price frequently above median
-                    combined_score += self.weights["below_median"]
-                elif below_median > 0.6:  # Price frequently below median
-                    combined_score -= self.weights["below_median"]
-                
-                # Volatility contribution - penalize high volatility
-                volatility = stats_data.get("volatility", 0.5)
-                if volatility > 0.8:  # High volatility
-                    combined_score -= self.weights["volatility"]
-                elif volatility < 0.3:  # Low volatility
-                    combined_score += self.weights["volatility"]
-                    
-                # Trend contribution
-                if stats_data.get("trend") == "uptrend":
-                    combined_score += self.weights["trend"]
-                else:
-                    combined_score -= self.weights["trend"]
-                    
-                # Check for manipulation as Rose Heart advised
-                if sentiment_data.get("manipulation_detected", False):
-                    combined_score *= 0.5  # Reduce confidence if manipulation detected
-                
-                # Determine action
-                action = "maintain"
-                if combined_score > 0.3:
-                    action = "increase"
-                elif combined_score < -0.3:
-                    action = "decrease"
-                
-                results.append({
-                    "asset": symbol,
-                    "current_allocation": asset.get("percentage", 0),
-                    "recommended_action": action,
-                    "confidence": abs(combined_score) * 100,
-                    "sentiment": sentiment_data.get("primary_emotion"),
-                    "statistical_signal": stats_data.get("statistical_signal"),
-                    "manipulation_detected": sentiment_data.get("manipulation_detected", False)
-                })
+            # Get fear/greed index from Allora
+            fear_greed = await self.allora_client.get_fear_greed_index(
+                assets=[asset["symbol"] for asset in portfolio.get("assets", [])]
+            )
             
-            # Determine if rebalancing is needed
-            rebalance_needed = any(result["recommended_action"] != "maintain" for result in results)
+            # Check for market manipulation
+            manipulation = await self.allora_client.detect_market_manipulation(
+                assets=[asset["symbol"] for asset in portfolio.get("assets", [])]
+            )
             
-            return {
+            # Combine signals with equal weights as recommended by Rose Heart
+            combined_signals = self._combine_signals(
+                sentiment=sentiment_analysis,
+                fear_greed=fear_greed,
+                manipulation=manipulation,
+                stats=stats
+            )
+            
+            # Calculate rebalancing costs
+            rebalancing_costs = await self.strategy_engine.calculate_rebalancing_costs(portfolio)
+            
+            # Calculate potential benefits based on combined signals
+            potential_benefits = self._calculate_potential_benefits(
+                portfolio=portfolio,
+                combined_signals=combined_signals,
+                stats=stats
+            )
+            
+            # Determine if rebalancing is recommended (2x cost/benefit ratio per Rose Heart)
+            rebalance_recommended = potential_benefits > (rebalancing_costs["total_cost"] * 2)
+            
+            # Generate target allocations if rebalancing is recommended
+            target_allocations = self._generate_target_allocations(
+                portfolio=portfolio,
+                combined_signals=combined_signals,
+                stats=stats
+            ) if rebalance_recommended else {}
+            
+            # Prepare recommendation
+            recommendation = {
                 "portfolio_id": portfolio_id,
-                "rebalance_needed": rebalance_needed,
-                "assets": results,
-                "message": "Rebalancing recommended" if rebalance_needed else "Portfolio is balanced"
+                "rebalance_recommended": rebalance_recommended,
+                "reason": "Benefits significantly exceed costs" if rebalance_recommended else "Costs exceed benefits",
+                "potential_benefits": potential_benefits,
+                "rebalancing_costs": rebalancing_costs,
+                "target_allocations": target_allocations,
+                "sentiment_analysis": sentiment_analysis,
+                "fear_greed_index": fear_greed,
+                "manipulation_detected": any(m.get("detected", False) for m in manipulation.values()),
+                "statistical_metrics": stats
             }
+            
+            return recommendation
         except Exception as e:
-            logger.error(f"Error in portfolio analysis: {str(e)}")
+            logger.error(f"Error analyzing portfolio: {str(e)}")
             return {
                 "portfolio_id": portfolio_id,
-                "rebalance_needed": False,
+                "rebalance_recommended": False,
                 "error": str(e),
                 "message": "Error analyzing portfolio"
             }
     
+    def _calculate_combined_score(
+        self, 
+        sentiment_data: Dict[str, Any],
+        stats_data: Dict[str, Any],
+        asset_profile: Any
+    ) -> float:
+        """
+        Calculate combined score from sentiment and statistical data
+        using asset-specific weights
+        """
+        score = 0.0
+        
+        # 1. Sentiment contribution
+        primary_emotion = sentiment_data.get("primary_emotion")
+        if primary_emotion == "greed":
+            score += asset_profile.sentiment_weight
+        elif primary_emotion == "fear":
+            score -= asset_profile.sentiment_weight
+            
+        # 2. Below median frequency contribution
+        below_median = stats_data.get("below_median_frequency", 0.5)
+        if below_median < 0.4:  # Price frequently above median
+            score += self.weights["below_median"] * asset_profile.statistical_weight
+        elif below_median > 0.6:  # Price frequently below median
+            score -= self.weights["below_median"] * asset_profile.statistical_weight
+        
+        # 3. Volatility contribution - penalize high volatility
+        volatility = stats_data.get("volatility", 0.5)
+        vol_normalized = min(1.0, volatility / 0.8)  # Cap at 1.0
+        score -= vol_normalized * self.weights["volatility"] * asset_profile.statistical_weight
+            
+        # 4. Trend contribution
+        if stats_data.get("trend") == "uptrend":
+            score += self.weights["trend"] * asset_profile.statistical_weight
+        else:
+            score -= self.weights["trend"] * asset_profile.statistical_weight
+            
+        # Normalize score to range -1.0 to 1.0
+        return max(-1.0, min(1.0, score))
+    
+    def _calculate_target_weight(
+        self,
+        current_weight: float,
+        combined_score: float,
+        sentiment_data: Dict[str, Any],
+        stats_data: Dict[str, Any]
+    ) -> float:
+        """Calculate target weight based on current weight and combined score"""
+        # Base adjustment on the combined score
+        # Score range is -1.0 to 1.0
+        adjustment_factor = 0.2  # Maximum 20% adjustment
+        
+        # Calculate adjustment as percentage of current weight
+        adjustment = current_weight * adjustment_factor * combined_score
+        
+        # Calculate new weight
+        new_weight = current_weight + adjustment
+        
+        # Ensure weight is between 0.05 (5%) and 0.8 (80%)
+        # Rose Heart advised to keep 20% in stablecoins
+        new_weight = max(0.05, min(0.8, new_weight))
+        
+        return new_weight
+        
+    def _analyze_rebalance_costs(
+        self,
+        portfolio: Dict[str, Any],
+        assets_analysis: List[AssetAnalysisResult]
+    ) -> Dict[str, Any]:
+        """
+        Analyze the costs and benefits of rebalancing
+        
+        Rose Heart emphasized not rebalancing too frequently due to fees
+        """
+        # Get current holdings and prices
+        holdings = {a["symbol"]: a.get("amount", 0) for a in portfolio.get("assets", [])}
+        weights = {a["symbol"]: a.get("weight", 0) for a in portfolio.get("assets", [])}
+        prices = {a["symbol"]: a.get("price", 0) for a in portfolio.get("assets", [])}
+        
+        # Calculate total portfolio value
+        total_value = sum(holdings.get(a, 0) * prices.get(a, 0) for a in holdings)
+        
+        # Calculate required trades
+        trades = {}
+        for asset_analysis in assets_analysis:
+            symbol = asset_analysis.asset
+            current_weight = weights.get(symbol, 0)
+            target_weight = asset_analysis.rebalance_signal.target_weight
+            
+            if abs(target_weight - current_weight) < 0.01:
+                continue  # Skip small changes
+                
+            # Calculate trade amount
+            current_value = total_value * current_weight
+            target_value = total_value * target_weight
+            value_change = target_value - current_value
+            
+            if abs(value_change) < 10:  # Skip very small trades
+                continue
+                
+            price = prices.get(symbol, 0)
+            if price <= 0:
+                continue
+                
+            amount_change = value_change / price
+            
+            trades[symbol] = {
+                "symbol": symbol,
+                "amount": amount_change,
+                "value": value_change,
+                "price": price,
+                "weight_change": target_weight - current_weight
+            }
+        
+        # Calculate estimated costs (fees)
+        fee_rate = self.config.get("FEE_RATE", 0.001)  # Default 0.1%
+        estimated_fees = sum(abs(t["value"]) * fee_rate for t in trades.values())
+        
+        # Calculate potential benefit
+        # This is a simplified estimate based on expected weight optimization
+        potential_benefit = total_value * 0.01  # Assume 1% improvement
+        for trade in trades.values():
+            # Add benefit from adjusting to improved weights
+            symbol = trade["symbol"]
+            for asset_analysis in assets_analysis:
+                if asset_analysis.asset == symbol:
+                    # Higher confidence = higher potential benefit
+                    confidence = asset_analysis.rebalance_signal.confidence
+                    # Adjust based on the confidence in the signal
+                    potential_benefit += abs(trade["value"]) * (confidence - 0.5) * 0.04
+        
+        return {
+            "total_portfolio_value": total_value,
+            "num_trades": len(trades),
+            "trades": list(trades.values()),
+            "estimated_cost": estimated_fees,
+            "potential_benefit": potential_benefit,
+            "cost_effective": potential_benefit > estimated_fees * 2,  # 2x threshold
+            "net_benefit": potential_benefit - estimated_fees
+        }
+            
     async def get_portfolio(self, user_id: str, portfolio_id: int) -> Dict[str, Any]:
-        """Get portfolio data from database or service"""
-        # This would connect to your portfolio service or database
-        # For now, returning dummy data
+        """Get portfolio data"""
+        # This would normally fetch from a database
+        # For now, return a mock portfolio
         return {
             "id": portfolio_id,
             "user_id": user_id,
-            "name": "Test Portfolio",
-            "last_rebalance_timestamp": "2023-04-01T12:00:00",
+            "name": "Sample Portfolio",
+            "last_rebalance_timestamp": (datetime.now().replace(day=1)).isoformat(),
             "assets": [
-                {"symbol": "BTC", "amount": 0.5, "percentage": 40},
-                {"symbol": "ETH", "amount": 5.0, "percentage": 30},
-                {"symbol": "SOL", "amount": 20.0, "percentage": 20},
-                {"symbol": "USDC", "amount": 1000.0, "percentage": 10}
+                {
+                    "symbol": "BTC",
+                    "amount": 0.5,
+                    "price": 50000,
+                    "value": 25000,
+                    "weight": 0.5
+                },
+                {
+                    "symbol": "ETH",
+                    "amount": 5,
+                    "price": 3000,
+                    "value": 15000,
+                    "weight": 0.3
+                },
+                {
+                    "symbol": "USDC",
+                    "amount": 10000,
+                    "price": 1,
+                    "value": 10000,
+                    "weight": 0.2
+                }
             ]
         }

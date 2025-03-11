@@ -2,6 +2,7 @@ from typing import Dict, Any, Optional, TYPE_CHECKING
 import asyncio
 import aiohttp
 import logging
+import json
 
 from ...config import Settings
 from ...intelligence.agent_kit.agent_manager import AgentManager
@@ -54,8 +55,9 @@ class AgentKitClient:
         conversation = await self.service.create_conversation(user_id)
         self.conversations[user_id] = conversation.id
         return conversation.id
-        
-    async def send_message(self, user_id, message, session_id=None):
+
+    #Can be used for rest api connections    
+    async def get_agent_response(self, user_id, message, session_id=None):
         """
         Send a message and get a response
         
@@ -71,14 +73,13 @@ class AgentKitClient:
         
         return response
     
+    #I can map this function to endpoints incase I want the UI to access these functions
     async def process_chat_action(self, user_id, intent, parameters, session_id=None):
         """
-        Process a domain-specific chat action from a user
+        Process a structured action from API/UI directly.
         
-        This method handles business operations such as:
-        - Market predictions with Allora integration
-        - Portfolio rebalancing with statistical analysis
-        - Other domain-specific workflows
+        This is NOT used by the agent's ReAct pattern, but provides
+        a direct entry point for UI components and API endpoints.
         """
         # Handle different intents with domain-specific logic
         if intent == "get_market_prediction":
@@ -119,208 +120,40 @@ class AgentKitClient:
     # Domain-specific operations
     
     async def _handle_market_prediction(self, user_id, parameters):
-        """Handle market prediction logic with Allora integration"""
-        asset = parameters.get("asset", "BTC")
-        topic_id = {"BTC": 14, "ETH": 13}.get(asset)
-        
-        if not topic_id:
-            return {"error": "Unsupported asset"}
-        
-        #             if topic_id:
-        #         try:
-        #             # Get Allora prediction
-        #             prediction = await self.allora_client.get_prediction(topic_id)
-                    
-        #             # Combine with statistical analysis
-        #             # This follows Rose Heart's advice about using AI for sentiment
-        #             # but statistics for numerical analysis
-        #             historical_data = await self._get_historical_data(asset)
-        #             metrics = self.market_analyzer.calculate_asset_metrics(historical_data)
-                    
-        #             # Combine insights (AI sentiment + statistical facts)
-        #             response = {
-        #                 "message": f"Analysis for {asset}:",
-        #                 "prediction": {
-        #                     "sentiment": prediction.get("sentiment", "neutral"),
-        #                     "direction": prediction.get("direction", "sideways"),
-        #                     "confidence": prediction.get("confidence", 0.5),
-        #                 },
-        #                 "statistics": {
-        #                     "volatility": metrics.get("volatility"),
-        #                     "current_vs_median": metrics.get("below_median_frequency"),
-        #                     "technical_indicators": "Mixed signals" # Placeholder
-        #                 },
-        #                 "recommendation": self._generate_recommendation(prediction, metrics)
-        #             }
-                    
-        #             return response
-        #         except Exception as e:
-        #             return {"error": f"Failed to get prediction: {str(e)}"}
-        #     else:
-        #         return {"error": "Unsupported asset"}
-                
-        # elif intent == "rebalance_portfolio":
-        #     # Get user portfolio data
-        #     user_info = await self.agent_kit.get_user_info(self.conversations[user_id])
-            
+        """Handle market prediction through ReAct pattern"""
         try:
-            # Get Allora prediction
-            prediction = await self.allora_client.get_prediction(topic_id)
-            
-            # Combine with statistical analysis
-            historical_data = await self._get_historical_data(asset)
-            metrics = self.market_analyzer.calculate_asset_metrics(historical_data)
-            
-            # Combine insights
-            response = {
-                "message": f"Analysis for {asset}:",
-                "prediction": {
-                    "sentiment": prediction.get("sentiment", "neutral"),
-                    "direction": prediction.get("direction", "sideways"),
-                    "confidence": prediction.get("confidence", 0.5),
-                },
-                "statistics": {
-                    "volatility": metrics.get("volatility"),
-                    "current_vs_median": metrics.get("below_median_frequency"),
-                    "technical_indicators": "Mixed signals"
-                },
-                "recommendation": self._generate_recommendation(prediction, metrics)
-            }
-            
-            return response
+            async with self.agent_manager.get_agent_executor(user_id) as agent:
+                asset = parameters.get("asset", "BTC")
+                
+                result = await agent.ainvoke({
+                    "messages": [{
+                        "role": "user",
+                        "content": f"Analyze the market for {asset} and provide a prediction with sentiment analysis."
+                    }]
+                })
+                
+                return result
         except Exception as e:
             logger.error(f"Error getting market prediction: {str(e)}")
             return {"error": f"Failed to get prediction: {str(e)}"}
     
     async def _handle_portfolio_rebalance(self, user_id, parameters):
-        """Handle portfolio rebalancing with statistical analysis"""
-        #   """Handle portfolio rebalancing logic"""
+        """Handle portfolio rebalancing through ReAct pattern"""
         try:
-            # Get user info through AgentManager to ensure wallet data is loaded
+            # First ensure wallet is loaded 
             async with self.agent_manager.get_agent_executor(user_id) as agent:
                 wallet_info_result = await agent.ainvoke({"messages": ["What is my wallet address?"]})
-                # Extract wallet address from result
                 wallet_address = self._extract_wallet_address(wallet_info_result)
-            
-            # Get portfolio data
-            portfolio = await self._get_user_portfolio(wallet_address)
-            
-            if not portfolio:
-                return {"message": "No portfolio found for this user"}
                 
-            # Get market data
-            current_prices = await self._get_current_prices(list(portfolio.keys()))
-            historical_data = {
-                asset: await self._get_historical_data(asset)
-                for asset in portfolio
-            }
-
-            # # Generate recommendation using strategy engine
-            # recommendation = await self.strategy_engine.generate_portfolio_recommendation(
-
-            # Generate recommendation using intelligence engine
-            recommendation = await self.intelligence_engine.generate_portfolio_recommendation(
-                portfolio, current_prices, historical_data
-            )
-            
-            # If rebalancing is recommended and profitable
-            if recommendation["rebalance_analysis"]["recommendation"] == "rebalance":
-                # Execute trades through AgentManager
-                trades = recommendation["rebalance_analysis"]["trades"]
-
+                # Now proceed with rebalance through ReAct pattern
+                result = await agent.ainvoke({
+                    "messages": [{
+                        "role": "user",
+                        "content": f"Analyze my portfolio with address {wallet_address} and execute a rebalance with these parameters: {json.dumps(parameters)}"
+                    }]
+                })
                 
-    #         asset = parameters.get("asset", "BTC")
-    #         topic_id = {"BTC": 14, "ETH": 13}.get(asset)
-            
-    #         if topic_id:
-    #             try:
-    #                 # Get Allora prediction
-    #                 prediction = await self.allora_client.get_prediction(topic_id)
-                    
-    #                 # Combine with statistical analysis
-    #                 # This follows Rose Heart's advice about using AI for sentiment
-    #                 # but statistics for numerical analysis
-    #                 historical_data = await self._get_historical_data(asset)
-    #                 metrics = self.market_analyzer.calculate_asset_metrics(historical_data)
-                    
-    #                 # Combine insights (AI sentiment + statistical facts)
-    #                 response = {
-    #                     "message": f"Analysis for {asset}:",
-    #                     "prediction": {
-    #                         "sentiment": prediction.get("sentiment", "neutral"),
-    #                         "direction": prediction.get("direction", "sideways"),
-    #                         "confidence": prediction.get("confidence", 0.5),
-    #                     },
-    #                     "statistics": {
-    #                         "volatility": metrics.get("volatility"),
-    #                         "current_vs_median": metrics.get("below_median_frequency"),
-    #                         "technical_indicators": "Mixed signals" # Placeholder
-    #                     },
-    #                     "recommendation": self._generate_recommendation(prediction, metrics)
-    #                 }
-                    
-    #                 return response
-    #             except Exception as e:
-    #                 return {"error": f"Failed to get prediction: {str(e)}"}
-    #         else:
-    #             return {"error": "Unsupported asset"}
-                
-    #     elif intent == "rebalance_portfolio":
-    #         # Get user portfolio data
-    #         user_info = await self.agent_kit.get_user_info(self.conversations[user_id])
-    #         # Generate recommendation using strategy engine
-    #         recommendation = await self.strategy_engine.generate_portfolio_recommendation(
-    #         # If rebalancing is recommended and profitable
-    #             # Prepare the trades
-                
-    #             # Execute trades through AgentKit
-    #             results = []
-    #             for asset, amount in trades.items():
-    #                 if amount > 0:  # Buy
-    #                     result = await self.execute_smart_contract(
-    #                         user_id,
-    #                         "DEX_CONTRACT_ADDRESS",
-    #                         "buy",
-    #                         [asset, str(abs(amount))]
-    #                     )
-    #                 else:  # Sell
-    #                     result = await self.execute_smart_contract(
-    #                         user_id,
-    #                         "DEX_CONTRACT_ADDRESS",
-    #                         "sell",
-    #                         [asset, str(abs(amount))]
-    #                     )
-    #                 results.append(result)
-                
-    #             return {
-    #                 "message": "Portfolio rebalancing complete",
-    #                 "trades_executed": len(results),
-    #                 "new_weights": recommendation["target_weights"]
-    #             }
-    #         else:
-    #             return {
-    #                 "message": "Rebalancing not recommended at this time",
-    #                 "reason": "Fees would exceed expected benefits",
-    #                 "current_weights": recommendation["rebalance_analysis"]["current_weights"]
-    #             }
-        
-    #     # Handle other intents...
-    #     return {"error": f"Unknown intent: {intent}"}
-
-
-                results = await self._execute_trades(user_id, trades)
-                
-                return {
-                    "message": "Portfolio rebalancing complete",
-                    "trades_executed": len(results),
-                    "new_weights": recommendation["target_weights"]
-                }
-            else:
-                return {
-                    "message": "Rebalancing not recommended at this time",
-                    "reason": "Fees would exceed expected benefits",
-                    "current_weights": recommendation["rebalance_analysis"]["current_weights"]
-                }
+                return result
         except Exception as e:
             logger.error(f"Error rebalancing portfolio: {str(e)}")
             return {"error": f"Failed to rebalance portfolio: {str(e)}"}

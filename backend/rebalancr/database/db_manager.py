@@ -122,6 +122,24 @@ class DatabaseManager:
             ON chat_history(user_id)
         """)
         
+        # Add portfolio events table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER,
+                event_type TEXT,
+                details TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (portfolio_id) REFERENCES portfolios (id)
+            )
+        """)
+        
+        # Create index for faster queries
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_portfolio_events_portfolio_id 
+            ON portfolio_events(portfolio_id)
+        """)
+        
         conn.commit()
         conn.close()
         logger.info("Database initialization complete")
@@ -348,3 +366,326 @@ class DatabaseManager:
             return []
         finally:
             conn.close()
+
+    async def get_portfolios_with_settings(self):
+        """Get all portfolios with rebalancing settings and user external IDs"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT 
+                    p.*,
+                    u.external_id as user_external_id,
+                    COUNT(a.id) as asset_count,
+                    SUM(a.amount) as total_assets
+                FROM portfolios p
+                JOIN users u ON p.user_id = u.id
+                LEFT JOIN assets a ON p.id = a.portfolio_id
+                GROUP BY p.id
+            """)
+            
+            portfolios = [dict(row) for row in cursor.fetchall()]
+            return portfolios
+        except Exception as e:
+            logger.error(f"Error getting portfolios with settings: {str(e)}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    async def update_portfolio(self, portfolio_id, update_data):
+        """Update portfolio settings including auto-rebalance options"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Build the SET clause dynamically based on provided fields
+            set_clauses = []
+            params = []
+            
+            for key, value in update_data.items():
+                set_clauses.append(f"{key} = ?")
+                params.append(value)
+            
+            # No fields to update
+            if not set_clauses:
+                return False
+            
+            params.append(portfolio_id)  # For the WHERE clause
+            
+            query = f"UPDATE portfolios SET {', '.join(set_clauses)} WHERE id = ?"
+            cursor.execute(query, params)
+            conn.commit()
+            
+            # Check if any rows were affected
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error updating portfolio {portfolio_id}: {str(e)}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    async def log_portfolio_event(self, portfolio_id, event_type, details=None):
+        """
+        Log a portfolio event in the database
+        
+        Args:
+            portfolio_id: ID of the portfolio
+            event_type: Type of event (rebalance_recommendation, auto_rebalance, etc.)
+            details: Dictionary with event details
+        
+        Returns:
+            ID of the created event record
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Convert details to JSON string if it's a dictionary
+            details_json = None
+            if details:
+                import json
+                details_json = json.dumps(details)
+            
+            # Insert the event
+            cursor.execute(
+                """
+                INSERT INTO portfolio_events 
+                (portfolio_id, event_type, details, timestamp) 
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    portfolio_id,
+                    event_type,
+                    details_json,
+                    datetime.now().isoformat()
+                )
+            )
+            
+            # Get the ID of the inserted event
+            event_id = cursor.lastrowid
+            
+            conn.commit()
+            return event_id
+        except Exception as e:
+            logger.error(f"Error logging portfolio event: {str(e)}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_user_portfolios(self, user_id):
+        """
+        Get all portfolios for a specific user
+        
+        Args:
+            user_id: External or internal user ID
+        
+        Returns:
+            List of portfolio dictionaries
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Check if user_id is numeric (internal ID) or string (external ID)
+            internal_user_id = None
+            try:
+                internal_user_id = int(user_id)
+            except (ValueError, TypeError):
+                # If conversion fails, treat as external ID
+                user = self.get_user_by_external_id(user_id)
+                if not user:
+                    return []
+                internal_user_id = user["id"]
+            
+            # Get portfolios
+            cursor.execute(
+                """
+                SELECT 
+                    p.*,
+                    COUNT(a.id) as asset_count,
+                    SUM(a.amount) as total_assets
+                FROM portfolios p
+                LEFT JOIN assets a ON p.id = a.portfolio_id
+                WHERE p.user_id = ?
+                GROUP BY p.id
+                """,
+                (internal_user_id,)
+            )
+            
+            # Convert to list of dictionaries
+            portfolios = [dict(row) for row in cursor.fetchall()]
+            return portfolios
+        except Exception as e:
+            logger.error(f"Error getting user portfolios: {str(e)}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_portfolio(self, portfolio_id):
+        """
+        Get a specific portfolio by ID with all its details
+        
+        Args:
+            portfolio_id: Portfolio ID
+        
+        Returns:
+            Portfolio dictionary or None if not found
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Get portfolio with asset statistics
+            cursor.execute(
+                """
+                SELECT 
+                    p.*,
+                    u.external_id as user_external_id,
+                    COUNT(a.id) as asset_count,
+                    SUM(a.amount) as total_assets
+                FROM portfolios p
+                JOIN users u ON p.user_id = u.id
+                LEFT JOIN assets a ON p.id = a.portfolio_id
+                WHERE p.id = ?
+                GROUP BY p.id
+                """,
+                (portfolio_id,)
+            )
+            
+            portfolio = cursor.fetchone()
+            
+            if not portfolio:
+                return None
+            
+            portfolio_dict = dict(portfolio)
+            
+            # Get assets for this portfolio
+            cursor.execute(
+                """
+                SELECT * FROM assets
+                WHERE portfolio_id = ?
+                """,
+                (portfolio_id,)
+            )
+            
+            assets = [dict(row) for row in cursor.fetchall()]
+            portfolio_dict["assets"] = assets
+            
+            return portfolio_dict
+        except Exception as e:
+            logger.error(f"Error getting portfolio: {str(e)}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    async def create_conversation(self, user_id):
+        """
+        Create a new conversation for a user
+        
+        Args:
+            user_id: External user ID
+        
+        Returns:
+            Conversation ID
+        """
+        try:
+            # Generate a unique conversation ID
+            import time
+            import uuid
+            conversation_id = f"conv_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+            
+            # Get internal user ID if needed
+            internal_user_id = None
+            try:
+                internal_user_id = int(user_id)
+            except (ValueError, TypeError):
+                # If conversion fails, treat as external ID
+                user = self.get_user_by_external_id(user_id)
+                if user:
+                    internal_user_id = user["id"]
+                else:
+                    # If no matching user, create a placeholder record
+                    internal_user_id = self.create_user(user_id)
+                
+            if not internal_user_id:
+                logger.error(f"Could not resolve internal ID for user {user_id}")
+                return None
+            
+            # Since conversations are implicit in our schema,
+            # we just need to return the generated ID
+            # The first message using this ID will effectively create the conversation
+            
+            return conversation_id
+        except Exception as e:
+            logger.error(f"Error creating conversation: {str(e)}")
+            return None
+
+    async def get_portfolio_events(self, portfolio_id, event_type=None, limit=50):
+        """
+        Get events for a specific portfolio
+        
+        Args:
+            portfolio_id: ID of the portfolio
+            event_type: Optional type of events to filter (e.g., 'rebalance_recommendation')
+            limit: Maximum number of events to return
+        
+        Returns:
+            List of event dictionaries
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Build query based on whether event_type is provided
+            if event_type:
+                cursor.execute(
+                    """
+                    SELECT * FROM portfolio_events
+                    WHERE portfolio_id = ? AND event_type = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (portfolio_id, event_type, limit)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT * FROM portfolio_events
+                    WHERE portfolio_id = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (portfolio_id, limit)
+                )
+            
+            events = []
+            for row in cursor.fetchall():
+                event = dict(row)
+                
+                # Parse JSON details if present
+                if event.get('details'):
+                    import json
+                    try:
+                        event['details'] = json.loads(event['details'])
+                    except:
+                        pass  # Keep as string if parsing fails
+                        
+                events.append(event)
+                
+            return events
+        except Exception as e:
+            logger.error(f"Error getting portfolio events: {str(e)}")
+            return []
+        finally:
+            if conn:
+                conn.close()

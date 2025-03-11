@@ -17,6 +17,7 @@ from coinbase_agentkit import (
     WalletProvider
 )
 from coinbase_agentkit_langchain import get_langchain_tools
+from rebalancr.api.dependencies import get_chat_history_manager, get_db_manager
 from ...database import db_manager
 
 from ...config import Settings
@@ -52,7 +53,7 @@ class AgentManager:
         self.service = AgentKitService.get_instance(settings)
         self.sqlite_path = settings.sqlite_db_path or "sqlite:///conversations.db"
         self.wallet_data_dir = settings.wallet_data_dir or "./data/wallets"
-        
+        self.action_providers = self.service.get_action_providers()
         # Initialize PrivyWalletProvider instead of CDP wallet provider
         self.wallet_provider = PrivyWalletProvider.get_instance(settings)
 
@@ -61,7 +62,8 @@ class AgentManager:
         
         logger.info("AgentManager initialized with wallet directory: %s", self.wallet_data_dir)
         
-        self.history_manager = ChatHistoryManager(db_manager)
+        self.history_manager = get_chat_history_manager()
+        self.db_manager = get_db_manager()
     
     # Remove _get_wallet_path, load_wallet_data, and save_wallet_data methods
     # since they're now handled by the PrivyWalletProvider
@@ -114,7 +116,7 @@ class AgentManager:
             return user_id.replace("did:privy:", "")
         return user_id
 
-    async def initialize_agentkit(self, user_id: str) -> AgentKit:
+    async def initialize_agent_for_user(self, user_id: str) -> AgentKit:
         """Initialize AgentKit with user-specific wallet data"""
         # Load existing wallet data if available
         # wallet_data = await self.load_wallet_data(user_id)
@@ -138,9 +140,10 @@ class AgentManager:
         agentkit = AgentKit(
             AgentKitConfig(
                 wallet_provider=self.wallet_provider,
-                action_providers=self.service.agent_kit.config.action_providers,
+                action_providers=self.action_providers,
             )
         )
+        
         
         # # Save updated wallet data
         # await self.save_wallet_data(user_id, self.wallet_provider)
@@ -165,7 +168,7 @@ class AgentManager:
         config = {"configurable": {"thread_id": thread_id}}
         
         # Initialize AgentKit with user's wallet data
-        agentkit = await self.initialize_agentkit(normalized_user_id)
+        agentkit = await self.initialize_agent_for_user(normalized_user_id)
         
         # Get tools using helper function
         tools = get_langchain_tools(agentkit)
@@ -201,7 +204,9 @@ class AgentManager:
         config = {"configurable": {"thread_id": thread_id}}
         
         # Store user message in history
-        conversation_id = session_id or "default"
+        #conversation_id = session_id or "default"
+        #check to be sure that this does not clash with store_message function
+        conversation_id = self.db_manager.create_conversation(normalized_user_id)
         await self.store_message(normalized_user_id, message, "user", conversation_id)
         
         response = ""
