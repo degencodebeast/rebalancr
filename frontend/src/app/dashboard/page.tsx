@@ -247,7 +247,7 @@ export default function Dashboard() {
             rightSection={
               <Button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim()}
+                disabled={!wsConnected || !inputMessage.trim()}
                 variant="default"
                 className="flex items-center gap-2"
               >
