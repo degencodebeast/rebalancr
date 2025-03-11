@@ -2,10 +2,11 @@
 .chat-input {
   .mantine-Textarea-wrapper {
     .mantine-Textarea-input {
-      background-color: #e1e2e6;
+      background-color: #f0f0f0;
       border: 1px solid #949494 !important;
-      border-radius: 40px;
+      border-radius: 8px;
       padding: 16px;
+      padding-right: 100px;
       color: #1b1919;
       border: none;
       font-size: 16px;
@@ -27,13 +28,18 @@
     right: 4%;
     align-self: flex-end;
     margin-bottom: 8px;
+    position: absolute;
+    z-index: 2;
 
     button {
-      border-radius: 40px;
+      border-radius: 8px;
       margin-right: 4px;
+      min-height: 40px;
+      min-width: 80px;
       background-color: #8c52ff;
       font-size: 16px;
       font-weight: 500;
+      white-space: nowrap;
     }
   }
 }
@@ -50,6 +56,7 @@
     display: flex;
     margin-bottom: 16px;
     align-items: flex-end;
+    width: 100%;
 
     &.user-message {
       flex-direction: row-reverse;
@@ -67,6 +74,13 @@
     position: relative;
     border: none;
     color: white;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    width: fit-content;
+    min-width: 60px;
+    //max-width: 600px;
 
     &.assistant-bubble {
       background-color: #8c52ff14;
@@ -76,6 +90,13 @@
     &.user-bubble {
       background-color: #8c52ff;
       border-bottom-right-radius: 0;
+    }
+
+    p {
+      margin: 0;
+      padding: 12px 16px;
+      overflow-wrap: break-word;
+      word-break: break-all;
     }
   }
 
@@ -120,24 +141,24 @@
   }
 }
 
+// @media screen and (max-width: 500px) {
+//   .chat-container {
+//     .message-bubble {
+//       max-width: 80%;
+//     }
+//   }
+
+//   .chat-input {
+//     .mantine-Textarea-section {
+//       right: 11%;
+//     }
+//   }
+// }
+
 @media screen and (max-width: 500px) {
   .chat-container {
     .message-bubble {
-      max-width: 80%;
-    }
-  }
-
-  .chat-input {
-    .mantine-Textarea-section {
-      right: 11%;
-    }
-  }
-}
-
-@media screen and (max-width: 500px) {
-  .chat-container {
-    .message-bubble {
-      max-width: 80%;
+      max-width: 85%;
     }
   }
 
