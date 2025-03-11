@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
 import { usePrivy } from '@privy-io/react-auth'
-import { Textarea, Paper, ScrollArea, Avatar, Text } from '@mantine/core'
+import { Textarea, Paper, ScrollArea, Avatar } from '@mantine/core'
 import SendIcon from '@/components/icons/SendIcon'
 import '@/app/dashboard/chats.scss'
 import { Button } from '@/components/ui/button'
