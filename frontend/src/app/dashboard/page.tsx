@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { blo } from 'blo'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import LogoImg from '../../../public/rebalancr_black.webp'
+import Image from 'next/image'
 
 // Message type definition
 interface Message {
@@ -178,10 +180,10 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-80px)] bg-white">
+      <div className="flex flex-col h-[calc(100vh-80px)] py-4 md:px-4">
         {/* Chat messages area */}
         <ScrollArea
-          className="flex-grow px-2 py-4 md:px-4 chat-container"
+          className="flex-grow px-2 py-4 md:px-4 chat-container bg-white md:rounded-lg shadow-sm border border-[#f1f1f1]"
           viewportRef={viewportRef}
         >
           {messages.map((message) => (
@@ -191,11 +193,13 @@ export default function Dashboard() {
                 message.sender === 'user' ? 'user-message' : 'assistant-message'
               }`}
             >
-              <div className="avatar-container">
+              <div className="avatar-container hidden md:block">
                 {message.sender === 'assistant' ? (
-                  <Avatar size={32} color="white" radius="xl" bg="#121212">
-                    AI
-                  </Avatar>
+                  <Image
+                    src={LogoImg}
+                    className="w-7 h-6 md:w-10 md:h-8"
+                    alt="Rebalancer Logo"
+                  />
                 ) : (
                   <Avatar
                     size={32}
@@ -230,7 +234,7 @@ export default function Dashboard() {
         </ScrollArea>
 
         {/* Input area */}
-        <div className="px-4 pb-6">
+        <div className="pt-4 px-2 md:px-0">
           <Textarea
             className="flex-grow chat-input"
             placeholder="Type your prompt here..."
@@ -243,7 +247,7 @@ export default function Dashboard() {
             rightSection={
               <Button
                 onClick={handleSendMessage}
-                disabled={!wsConnected || !inputMessage.trim()}
+                disabled={!inputMessage.trim()}
                 variant="default"
                 className="flex items-center gap-2"
               >

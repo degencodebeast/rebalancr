@@ -91,7 +91,7 @@ export default function DashboardLayout({
             onClick={toggle}
             hiddenFrom="md"
             size="md"
-            color="white"
+            color="#121212"
           />
           <div className="flex items-center gap-3">
             <Avatar
@@ -120,7 +120,7 @@ export default function DashboardLayout({
             onClick={toggle}
             hiddenFrom="md"
             size="md"
-            color="white"
+            color="#121212"
           />
         </div>
         {navLinks.map((link, index) => (
