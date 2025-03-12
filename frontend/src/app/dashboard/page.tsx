@@ -13,6 +13,9 @@ import remarkGfm from 'remark-gfm'
 import LogoImg from '../../../public/rebalancr_black.webp'
 import Image from 'next/image'
 import { useWebSocketWithAuth } from '@/hooks/useWebSocketWithAuth'
+import { useRouter } from 'next/navigation'
+import { useSelector } from 'react-redux'
+import { selectHasVerified } from '@/store/auth/authSlice'
 
 // Message type definition
 interface Message {
@@ -27,6 +30,8 @@ export default function Dashboard() {
   const [inputMessage, setInputMessage] = useState('')
   const viewportRef = useRef<HTMLDivElement>(null)
   const welcomeMessageShownRef = useRef(false)
+  const router = useRouter()
+  const hasVerified = useSelector(selectHasVerified)
   
   // Use our custom hook for WebSocket communication
   const { 
@@ -63,6 +68,25 @@ export default function Dashboard() {
       });
     }
   }, [messages]);
+
+  // Redirect to home if not verified
+  useEffect(() => {
+    if (!hasVerified) {
+      router.push('/')
+    }
+  }, [hasVerified, router])
+  
+  // Show loading until verification is confirmed
+  if (!hasVerified) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin h-10 w-10 border-t-2 border-b-2 border-[#8c52ff] rounded-full mx-auto mb-4"></div>
+          <p className="text-lg">Verifying authentication...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || !isConnected || !isAuthenticated) return;

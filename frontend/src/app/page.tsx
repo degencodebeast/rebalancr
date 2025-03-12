@@ -13,7 +13,7 @@ import Footer from '@/components/Layout/Footer'
 import { useAuthRedirect } from '@/hooks/useAuthRedirect'
 
 export default function Home() {
-  const { login } = useAuthRedirect()
+  const { login, isVerifying, verificationError } = useAuthRedirect()
 
   return (
     <div className="min-h-screen font-outfit">
@@ -29,21 +29,39 @@ export default function Home() {
             Rebalancr is an AI-powered automated rebalancing protocol designed
             to optimize crypto portfolios. Built on Monad!
           </p>
-          <div className="flex gap-8 items-center mt-10">
-            <Button
-              onClick={login}
-              className="rounded-[45px] text-[20px] font-normal text-white bg-[#121212] py-3 px-7 hover:bg-[#121212]/90"
-            >
-              Connect Wallet
-            </Button>
-            <Link
-              className="hidden md:block text-[20px] font-normal text-[#8C52FF] underline"
-              href="/learn-more"
-            >
-              Learn More
-            </Link>
+          <div className="flex flex-col gap-4 items-center mt-10">
+            <div className="flex gap-8 items-center">
+              <Button
+                onClick={login}
+                disabled={isVerifying}
+                className="rounded-[45px] text-[20px] font-normal text-white bg-[#121212] py-3 px-7 hover:bg-[#121212]/90"
+              >
+                {isVerifying ? (
+                  <div className="flex items-center gap-2">
+                    <span className="animate-spin h-5 w-5 border-t-2 border-b-2 border-white rounded-full"></span>
+                    Verifying...
+                  </div>
+                ) : (
+                  'Connect Wallet'
+                )}
+              </Button>
+              <Link
+                className="hidden md:block text-[20px] font-normal text-[#8C52FF] underline"
+                href="/learn-more"
+              >
+                Learn More
+              </Link>
+            </div>
+            
+            {/* Show verification error if any */}
+            {verificationError && (
+              <div className="p-3 bg-red-100 text-red-800 rounded-md max-w-md">
+                {verificationError}
+              </div>
+            )}
           </div>
         </div>
+        
         <Image
           className="hidden md:block mt-32"
           src={textImg}
@@ -73,7 +91,7 @@ export default function Home() {
               Maximize Yield
             </h4>
             <p className="md:text-[24px] text-[18px] font-light">
-              Let Rebalancr optimize your crypto assets, ensuring you’re always
+              Let Rebalancr optimize your crypto assets, ensuring you're always
               positioned for the best possible returns, with minimal effort
             </p>
           </div>
@@ -110,7 +128,7 @@ export default function Home() {
                 continuously analyzing market trends and asset performance, it
                 intelligently adjusts allocations to minimize risk and maximize
                 returns. Whether the market is bullish or bearish, Rebalancr
-                ensures your investments stay balanced, so you don’t have to
+                ensures your investments stay balanced, so you don't have to
                 constantly monitor or manually trade.
               </p>
               <p className="md:text-[24px] text-[19px] font-light md:leading-[35px] leading-[25px] md:mt-4 mt-1">
