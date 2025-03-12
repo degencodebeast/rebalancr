@@ -12,7 +12,7 @@ from ..intelligence.agent_kit.wallet_provider import get_wallet_provider
 from ..intelligence.agent_kit.chat_agent import PortfolioAgent
 from ..intelligence.allora.client import AlloraClient
 from ..chat.history_manager import ChatHistoryManager
-from ..websockets.chat_handler import ChatWebSocketHandler
+from ..websockets.websocket_handlers import handle_websocket
 from ..services.market import MarketDataService
 from ..strategy.risk_manager import RiskManager
 from ..strategy.yield_optimizer import YieldOptimizer
@@ -31,6 +31,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from .middleware.privy_auth import privy_auth_middleware
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +61,7 @@ app = initialize_services(app)
 #check whether this is correct or if I need to change it to a different endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await handle_chat_websocket(websocket)
+    await handle_websocket(websocket)
 
 # Include routers
 app.include_router(auth.router)
@@ -70,8 +71,10 @@ app.include_router(wallet_routes.router)
 
 
 # At the end of your app initialization
-@app.on_event("startup")
+@app.lifespan("startup")
 async def startup_event():
+    """Initialize the database and run migrations"""
+    await app.state.db_manager.initialize()
     # Start portfolio monitoring in background
     background_tasks = BackgroundTasks()
     background_tasks.add_task(
@@ -80,7 +83,10 @@ async def startup_event():
         app.state.strategy_engine
     )
 
-
+@app.lifespan("shutdown")
+async def shutdown_db():
+    """Close database connections on shutdown"""
+    await app.state.db_manager.close()
 # # # Auth dependency - simplified for hackathon
 # # async def get_user_from_token(token: str = Query(...)):
 # #     # In a real app, validate the token against your database

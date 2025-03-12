@@ -2,6 +2,7 @@ import sqlite3
 import logging
 import os
 from pathlib import Path
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,8 @@ def run_migration(db_path):
         
         logger.info(f"Running migration on database at {file_path}")
         
-        # Connect to the database
+        # Connect to the database - we keep this synchronous for simplicity
+        # as migrations typically run at startup before async event loop is active
         conn = sqlite3.connect(file_path)
         cursor = conn.cursor()
         
@@ -46,6 +48,13 @@ def run_migration(db_path):
     finally:
         if conn:
             conn.close()
+
+# Add an async version for cases where we need to run migration within async context
+async def run_migration_async(db_path):
+    """Async wrapper around run_migration for use in async contexts"""
+    # Use a thread executor to run the synchronous migration function
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, run_migration, db_path)
 
 if __name__ == "__main__":
     # Configure logging

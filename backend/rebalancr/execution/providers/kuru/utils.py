@@ -10,7 +10,7 @@ from web3.types import Wei
 from coinbase_agentkit.wallet_providers import EvmWalletProvider
 from .constants import ERC20_ABI, TOKEN_ADDRESSES
 
-async def get_token_address(token_symbol: str, chain_id: int) -> str:
+def get_token_address(token_symbol: str, chain_id: int) -> str:
     """Get token address from symbol"""
     if token_symbol.upper() == "ETH":
         return "0x0000000000000000000000000000000000000000"
@@ -21,7 +21,7 @@ async def get_token_address(token_symbol: str, chain_id: int) -> str:
     
     return token_address
 
-async def format_token_amount(amount: Union[str, int, float, Decimal], decimals: int = 18) -> int:
+def format_token_amount(amount: Union[str, int, float, Decimal], decimals: int = 18) -> int:
     """Format token amount to wei"""
     if isinstance(amount, str):
         amount = Decimal(amount)
@@ -32,7 +32,7 @@ async def format_token_amount(amount: Union[str, int, float, Decimal], decimals:
     # Convert to wei
     return int(amount * Decimal(10) ** Decimal(decimals))
 
-async def get_token_decimals(wallet_provider: EvmWalletProvider, token_address: str) -> int:
+def get_token_decimals(wallet_provider: EvmWalletProvider, token_address: str) -> int:
     """Get token decimals"""
     # ETH has 18 decimals
     if token_address == "0x0000000000000000000000000000000000000000":
@@ -52,7 +52,7 @@ async def get_token_decimals(wallet_provider: EvmWalletProvider, token_address: 
         # Default to 18 decimals if something goes wrong
         return 18
 
-async def get_token_balance(wallet_provider: EvmWalletProvider, token_address: str) -> int:
+def get_token_balance(wallet_provider: EvmWalletProvider, token_address: str) -> int:
     """Get token balance for address"""
     address = wallet_provider.get_address()
     
@@ -73,7 +73,7 @@ async def get_token_balance(wallet_provider: EvmWalletProvider, token_address: s
     except Exception as e:
         return 0
 
-async def approve_token(wallet_provider: EvmWalletProvider, token_address: str, spender_address: str, amount: int) -> Dict[str, Any]:
+def approve_token(wallet_provider: EvmWalletProvider, token_address: str, spender_address: str, amount: int) -> Dict[str, Any]:
     """Approve a spender to use tokens
     
     Args:
@@ -121,7 +121,7 @@ async def approve_token(wallet_provider: EvmWalletProvider, token_address: str, 
     except Exception as e:
         raise Exception(f"Error approving token: {str(e)}")
 
-async def estimate_gas_with_buffer(
+def estimate_gas_with_buffer(
     tx_params: Dict[str, Any],
     buffer_percentage: float = 20.0
 ) -> int:

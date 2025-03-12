@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     
     PRIVY_APP_ID: str = os.getenv("PRIVY_APP_ID")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
+    PRIVY_VERIFICATION_KEY: str = os.getenv("PRIVY_VERIFICATION_KEY")
     #PRIVY_WALLET_ID: Optional[str] = os.getenv("PRIVY_WALLET_ID")
     #PRIVY_API_KEY: str = os.getenv("PRIVY_API_KEY")  # API key for server wallets
     #PRIVY_WEBHOOK_SECRET: str = os.getenv("PRIVY_WEBHOOK_SECRET")  # For webhook verification

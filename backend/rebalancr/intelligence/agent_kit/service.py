@@ -76,7 +76,6 @@ class AgentKitService:
                 pyth_action_provider(),
                 weth_action_provider(),
                 rebalancer_action_provider(),
-                market_action_provider(),
                 portfolio_action_provider(),
                 kuru_action_provider()
             ]
