@@ -3,13 +3,15 @@
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
 import { usePrivy } from '@privy-io/react-auth'
-import { Textarea, Paper, ScrollArea, Avatar, Text } from '@mantine/core'
+import { Textarea, Paper, ScrollArea, Avatar } from '@mantine/core'
 import SendIcon from '@/components/icons/SendIcon'
 import '@/app/dashboard/chats.scss'
 import { Button } from '@/components/ui/button'
 import { blo } from 'blo'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import LogoImg from '../../../public/rebalancr_black.webp'
+import Image from 'next/image'
 
 // Message type definition
 interface Message {
@@ -31,7 +33,7 @@ export default function Dashboard() {
   // Connect to WebSocket
   useEffect(() => {
     // const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws")
-    const ws = new WebSocket("ws://localhost:8000/ws")
+    const ws = new WebSocket('ws://localhost:8000/ws')
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -43,20 +45,25 @@ export default function Dashboard() {
     }
 
     ws.onmessage = (event) => {
-      let data;
+      let data
       try {
-        data = JSON.parse(event.data);
+        data = JSON.parse(event.data)
         console.log('Received message:', data)
       } catch (e) {
-        console.error("Failed to parse websocket message as JSON, using raw data instead:", e);
-        data = { content: event.data }; // Fall back to raw text
+        console.error(
+          'Failed to parse websocket message as JSON, using raw data instead:',
+          e,
+        )
+        data = { content: event.data } // Fall back to raw text
       }
-      console.log('Received message content:', data.content);
+      console.log('Received message content:', data.content)
 
       // If data.content exists, treat it as a chat message
       if (data.content) {
         addMessage({
-          id: `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          id: `assistant-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`,
           sender: 'assistant',
           content: data.content,
           timestamp: new Date(),
@@ -173,10 +180,10 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-80px)] bg-[#3f3f3f]">
+      <div className="flex flex-col h-[calc(100vh-80px)] py-4 md:px-4">
         {/* Chat messages area */}
         <ScrollArea
-          className="flex-grow px-2 py-4 md:px-4 chat-container"
+          className="flex-grow px-2 py-4 md:px-4 chat-container bg-white md:rounded-lg shadow-sm border border-[#f1f1f1]"
           viewportRef={viewportRef}
         >
           {messages.map((message) => (
@@ -186,11 +193,13 @@ export default function Dashboard() {
                 message.sender === 'user' ? 'user-message' : 'assistant-message'
               }`}
             >
-              <div className="avatar-container">
+              <div className="avatar-container hidden md:block">
                 {message.sender === 'assistant' ? (
-                  <Avatar size={32} color="white" radius="xl" bg="#121212">
-                    AI
-                  </Avatar>
+                  <Image
+                    src={LogoImg}
+                    className="w-7 h-6 md:w-10 md:h-8"
+                    alt="Rebalancer Logo"
+                  />
                 ) : (
                   <Avatar
                     size={32}
@@ -225,7 +234,7 @@ export default function Dashboard() {
         </ScrollArea>
 
         {/* Input area */}
-        <div className="px-4 pb-6">
+        <div className="pt-4 px-2 md:px-0">
           <Textarea
             className="flex-grow chat-input"
             placeholder="Type your prompt here..."

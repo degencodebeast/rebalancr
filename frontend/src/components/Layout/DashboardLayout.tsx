@@ -7,8 +7,6 @@ import { usePrivy } from '@privy-io/react-auth'
 import DashboardIcon from '../icons/DashboardIcon'
 import AssetsIcon from '../icons/AssetsIcon'
 import AnalyticsIcon from '../icons/AnalyticsIcon'
-import HistoryIcon from '../icons/HistoryIcon'
-import SettingsIcon from '../icons/SettingsIcon'
 import SupportIcon from '../icons/SupportIcon'
 import { useEffect } from 'react'
 import { Button } from '../ui/button'
@@ -21,32 +19,32 @@ import '@/components/Layout/dashboard.scss'
 // Define navigation links
 const navLinks = [
   {
-    icon: <DashboardIcon />,
+    icon: (color: string) => <DashboardIcon color={color} />,
     name: 'Dashboard',
     url: '/dashboard',
   },
   {
-    icon: <AssetsIcon />,
+    icon: (color: string) => <AssetsIcon color={color} />,
     name: 'Assets',
     url: '/assets',
   },
   {
-    icon: <AnalyticsIcon />,
+    icon: (color: string) => <AnalyticsIcon color={color} />,
     name: 'Analytics',
-    url: '/analytics',
+    url: '#',
   },
+  // {
+  //   icon: (color: string) => <HistoryIcon color={color} />,
+  //   name: 'History',
+  //   url: '#',
+  // },
+  // {
+  //   icon: (color: string) => <SettingsIcon color={color} />,
+  //   name: 'Settings',
+  //   url: '#',
+  // },
   {
-    icon: <HistoryIcon />,
-    name: 'History',
-    url: '/history',
-  },
-  {
-    icon: <SettingsIcon />,
-    name: 'Settings',
-    url: '/settings',
-  },
-  {
-    icon: <SupportIcon />,
+    icon: (color: string) => <SupportIcon color={color} />,
     name: 'Support',
     url: '/support',
   },
@@ -93,7 +91,7 @@ export default function DashboardLayout({
             onClick={toggle}
             hiddenFrom="md"
             size="md"
-            color="white"
+            color="#121212"
           />
           <div className="flex items-center gap-3">
             <Avatar
@@ -101,10 +99,10 @@ export default function DashboardLayout({
               radius="xl"
               src={blo(`0x${user?.wallet?.address}`)}
             />
-            <div className="logo text-white text-xl">Nad Keone</div>
+            <div className="logo text-[#000000b3] text-xl">Nad Keone</div>
           </div>
         </div>
-        <Button variant="outline" onClick={logout}>
+        <Button variant="default" className="rounded-full" onClick={logout}>
           Sign Out
         </Button>
       </AppShell.Header>
@@ -113,7 +111,7 @@ export default function DashboardLayout({
         <div className="mb-12  mt-8 flex justify-between items-center">
           <div className="flex gap-4 items-center">
             <Image src={LogoImg} width={60} height={45} alt="Rebalancer Logo" />
-            <h1 className="text-[#f0f0f0] text-[32px] font-medium">
+            <h1 className="text-[#000000b3] text-[32px] font-medium">
               Rebalancr
             </h1>
           </div>
@@ -122,7 +120,7 @@ export default function DashboardLayout({
             onClick={toggle}
             hiddenFrom="md"
             size="md"
-            color="white"
+            color="#121212"
           />
         </div>
         {navLinks.map((link, index) => (
@@ -131,7 +129,9 @@ export default function DashboardLayout({
             key={index}
             active={pathname.startsWith(link.url)}
             label={link.name}
-            leftSection={link.icon}
+            leftSection={link.icon(
+              pathname.startsWith(link.url) ? '#FFFFFF' : '#818181',
+            )}
             onClick={() => router.push(link.url)}
           />
         ))}
