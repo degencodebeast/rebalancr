@@ -11,11 +11,20 @@ from typing import Dict, List, Any, Optional, Type, Union, cast
 from pydantic import BaseModel, Field, root_validator, validator
 from decimal import Decimal
 
-from coinbase_agentkit.action_provider.provider import ActionProvider, create_action
-from coinbase_agentkit.entity import Action
-from coinbase_agentkit.wallet_provider.evm import EvmWalletProvider
 
-from rebalancr.intelligence.intelligence_engine import IntelligenceEngine
+from coinbase_agentkit.action_providers.action_decorator import create_action
+from coinbase_agentkit.action_providers.action_provider import ActionProvider
+from coinbase_agentkit.network import Network
+from coinbase_agentkit.wallet_providers import EvmWalletProvider
+
+from typing import TYPE_CHECKING, Any
+if TYPE_CHECKING:
+    from rebalancr.intelligence.intelligence_engine import IntelligenceEngine
+else:
+    # For runtime, just use Any
+    IntelligenceEngine = Any
+
+
 from rebalancr.strategy.engine import StrategyEngine
 from rebalancr.strategy.risk_manager import RiskManager
 from rebalancr.strategy.yield_optimizer import YieldOptimizer
@@ -75,18 +84,18 @@ class SimulateRebalanceParams(BaseModel):
     target_allocations: Dict[str, float] = Field(default_factory=dict)
     time_horizon_days: int = Field(ge=1, le=365, default=30)
     
-    @root_validator
-    def validate_allocations(cls, values):
-        allocations = values.get('target_allocations', {})
-        if not allocations:
-            raise ValueError('Target allocations must be provided')
+    @root_validator(skip_on_failure=True)
+    def validate_allocations(cls, v, values):
+            allocations = values.get('target_allocations', {})
+            if not allocations:
+                raise ValueError('Target allocations must be provided')
             
-        total = sum(allocations.values())
-        if abs(total - 1.0) > 0.01:  # Allow small rounding errors
-            raise ValueError(f'Target allocations must sum to 1.0 (got {total})')
+            total = sum(allocations.values())
+            if abs(total - 1.0) > 0.01:  # Allow small rounding errors
+                raise ValueError(f'Target allocations must sum to 1.0 (got {total})')
             
-        return values
-    
+            return values
+        
     @validator('time_horizon_days')
     def validate_time_horizon(cls, v):
         if v < 1 or v > 365:
@@ -112,7 +121,10 @@ class PortfolioActionProvider(ActionProvider):
         db_manager,
         config: Dict[str, Any]
     ):
-        super().__init__()
+        super().__init__(
+            name="portfolio-action", 
+            action_providers=[]  # Empty list since actions are defined using decorators 
+        )
         self.wallet_provider = wallet_provider
         self.intelligence_engine = intelligence_engine
         self.strategy_engine = strategy_engine
@@ -129,7 +141,7 @@ class PortfolioActionProvider(ActionProvider):
     @create_action(
         name="analyze-portfolio",
         description="Analyze a portfolio and provide comprehensive insights including sentiment analysis",
-        param_model=AnalyzePortfolioParams
+        schema=AnalyzePortfolioParams
     )
     async def analyze_portfolio(self, params: AnalyzePortfolioParams) -> Dict[str, Any]:
         """
@@ -195,7 +207,7 @@ class PortfolioActionProvider(ActionProvider):
     @create_action(
         name="assess-risk",
         description="Provide detailed risk assessment with market sentiment influences",
-        param_model=AssessRiskParams
+        schema=AssessRiskParams
     )
     async def assess_risk(self, params: AssessRiskParams) -> Dict[str, Any]:
         """
@@ -267,7 +279,7 @@ class PortfolioActionProvider(ActionProvider):
     @create_action(
         name="find-yield",
         description="Find optimized yield opportunities with sentiment considerations",
-        param_model=FindYieldParams
+        schema=FindYieldParams
     )
     async def find_yield(self, params: FindYieldParams) -> Dict[str, Any]:
         """
@@ -340,7 +352,7 @@ class PortfolioActionProvider(ActionProvider):
     @create_action(
         name="simulate-rebalance",
         description="Simulate portfolio rebalance with custom allocations",
-        param_model=SimulateRebalanceParams
+        schema=SimulateRebalanceParams
     )
     async def simulate_rebalance(self, params: SimulateRebalanceParams) -> Dict[str, Any]:
         """

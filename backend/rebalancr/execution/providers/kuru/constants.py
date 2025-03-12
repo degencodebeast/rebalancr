@@ -252,3 +252,12 @@ ERC20_ABI = [
         "type": "function"
     }
 ]
+
+# Add this definition
+DEFAULT_RPC_URLS = {
+    "42161": "https://arb1.arbitrum.io/rpc",  # Arbitrum One
+    "421613": "https://goerli-rollup.arbitrum.io/rpc",  # Arbitrum Goerli
+    "1": "https://eth.llamarpc.com",  # Ethereum Mainnet
+    "5": "https://rpc.ankr.com/eth_goerli",  # Ethereum Goerli
+    "535037": "https://rpc.testnet.monad.xyz",  # Monad Testnet
+}

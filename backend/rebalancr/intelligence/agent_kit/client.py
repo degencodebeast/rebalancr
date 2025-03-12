@@ -3,16 +3,15 @@ import asyncio
 import aiohttp
 import logging
 import json
+from datetime import datetime
+from langchain_core.messages import AIMessage, HumanMessage
 
 from ...config import Settings
-from ...intelligence.agent_kit.agent_manager import AgentManager
-from ..allora.client import AlloraClient
-from ..market_analysis import MarketAnalyzer
-from .service import AgentKitService
 
-# Use conditional import to avoid circular imports
+# Use TYPE_CHECKING for circular imports
 if TYPE_CHECKING:
     from ..intelligence_engine import IntelligenceEngine
+    from .agent_manager import AgentManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,33 +38,49 @@ class AgentKitClient:
     - WebSocket communication (handled by WebSocketMessageHandler)
     - Low-level infrastructure (handled by AgentKitService)
     """
-    def __init__(self, config: Settings, intelligence_engine=None):
+    def __init__(self, config: Settings, intelligence_engine=None, agent_manager=None):
         """Initialize the client with references to required services."""
-        # Get the service and manager singletons
-        self.service = AgentKitService.get_instance(config)
-        self.agent_manager = AgentManager.get_instance(config)
+        # Import service here to avoid circular dependency 
+        from .service import AgentKitService
         
-        # Store conversations by user
-        self.conversations = {}
+        # Get the service singleton
+        self.service = AgentKitService.get_instance(config)
+        
+        # Store agent manager (will be set later if None)
+        self.agent_manager = agent_manager
         
         # Initialize domain-specific services
+        from ..allora.client import AlloraClient
+        from ..market_analysis import MarketAnalyzer
+        
         self.allora_client = AlloraClient(api_key=config.ALLORA_API_KEY)
         self.market_analyzer = MarketAnalyzer()
         
         # Initialize intelligence engine reference
         self.intelligence_engine = intelligence_engine
         
-    def set_intelligence_engine(self, intelligence_engine):
+        # Store conversations by user
+        self.conversations = {}
+        
+    def set_intelligence_engine(self, intelligence_engine: "IntelligenceEngine"):
         """Set the intelligence engine after initialization"""
         self.intelligence_engine = intelligence_engine
         
+    def set_agent_manager(self, agent_manager: "AgentManager"):
+        """Set the agent manager after initialization"""
+        self.agent_manager = agent_manager
+        
     async def initialize_session(self, user_id):
-        """Initialize a new conversation for a user"""
-        conversation = await self.service.create_conversation(user_id)
+        """Initialize a new conversation and agent for a user"""
+        # Create conversation
+        conversation = await self.agent_manager.db_manager.create_conversation(user_id)
         self.conversations[user_id] = conversation.id
+        
+        # Ensure wallet is initialized (through manager)
+        await self.agent_manager.initialize_agent_for_user(user_id)
+        
         return conversation.id
-
-    #Can be used for rest api connections    
+    
     async def get_agent_response(self, user_id, message, session_id=None):
         """
         Send a message and get a response
@@ -256,4 +271,66 @@ class AgentKitClient:
             "action": recommendation,
             "confidence": confidence,
             "reasoning": f"Combined AI sentiment ({sentiment_score}) and statistical signals ({stats_score})"
+        }
+
+    # Add streaming support method
+    async def stream_agent_response(self, user_id, message, conversation_id=None):
+        """Stream agent responses with business logic enrichment"""
+        # Store user message through manager
+        await self.agent_manager.store_message(
+            user_id=user_id,
+            message=message,
+            message_type="user",
+            conversation_id=conversation_id or "default"
+        )
+        
+        # Get market context if message seems related to trading/finance
+        market_context = None
+        if any(term in message.lower() for term in ["market", "price", "trade", "buy", "sell"]):
+            try:
+                # Optional: Add market data for relevant queries
+                market_context = await self._get_market_context()
+                # Enhance message with context
+                message = f"{message}\n\nCurrent market context: {json.dumps(market_context)}"
+            except Exception as e:
+                logger.warning(f"Failed to get market context: {e}")
+        
+        # Track the last content value
+        last_content = None
+        
+        # Process with agent via streaming
+        async with self.agent_manager.get_agent_executor(user_id, conversation_id) as agent_executor:
+            # Stream responses from the agent
+            async for chunk in agent_executor.astream(
+                input={"messages": [HumanMessage(content=message)]},
+                config={"configurable": {"thread_id": f"{user_id}-{conversation_id}"}}
+            ):
+                # Handle agent responses
+                if "agent" in chunk:
+                    content = chunk["agent"]["messages"][0].content
+                    last_content = content  # Store the last content
+                    yield chunk
+                # Handle other chunk types
+                else:
+                    yield chunk
+        
+        # After streaming complete, store the response if we got any content
+        if last_content:
+            await self.agent_manager.store_message(
+                user_id=user_id,
+                message=last_content,  # Using the tracked last content
+                message_type="agent",
+                conversation_id=conversation_id or "default"
+            )
+
+    # Helper method for market context
+    async def _get_market_context(self):
+        """Get current market context for enrichment"""
+        # This could call your MarketAnalyzer or other services
+        # Simplified example:
+        return {
+            "btc_price": 60000, 
+            "eth_price": 3000,
+            "market_trend": "bullish",
+            "timestamp": datetime.now().isoformat()
         }

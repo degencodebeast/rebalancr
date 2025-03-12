@@ -1,12 +1,15 @@
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, List, Any, Optional, Union, TYPE_CHECKING
+from datetime import datetime, timedelta
 
 from .risk_manager import RiskManager
 from .yield_optimizer import YieldOptimizer
 from .wormhole import WormholeService
-from ..intelligence.intelligence_engine import IntelligenceEngine
+
+# Use TYPE_CHECKING to break circular import
+if TYPE_CHECKING:
+    from ..intelligence.intelligence_engine import IntelligenceEngine
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +20,13 @@ class StrategyEngine:
     statistical analysis as recommended by Rose Heart.
     """
     
-    def __init__(
-        self,
-        intelligence_engine: IntelligenceEngine,
-        risk_manager: RiskManager,
-        yield_optimizer: YieldOptimizer,
-        wormhole_service: WormholeService,
-        db_manager,
-        config: Dict[str, Any]
-    ):
-        self.intelligence_engine = intelligence_engine
-        self.risk_manager = risk_manager
-        self.yield_optimizer = yield_optimizer
-        self.wormhole_service = wormhole_service
-        self.db_manager = db_manager
-        self.config = config
+    def __init__(self):
+        self.intelligence_engine = None  # Will be set later
+        self.risk_manager = None
+        self.yield_optimizer = None
+        self.wormhole_service = None
+        self.db_manager = None
+        self.config = None
         
         # Asset-specific profiles following Rose Heart's recommendation
         self.asset_profiles = {
@@ -79,6 +74,10 @@ class StrategyEngine:
                 "max_allocation": 0.15
             }
         }
+    
+    def set_intelligence_engine(self, intelligence_engine):
+        """Set the intelligence engine after initialization"""
+        self.intelligence_engine = intelligence_engine
     
     async def analyze_portfolio_statistics(self, portfolio_id: int) -> Dict[str, Any]:
         """

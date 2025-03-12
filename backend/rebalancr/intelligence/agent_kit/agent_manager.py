@@ -17,12 +17,13 @@ from coinbase_agentkit import (
     WalletProvider
 )
 from coinbase_agentkit_langchain import get_langchain_tools
-from ...api.dependencies import get_chat_history_manager, get_db_manager
-from ...database import db_manager
+from rebalancr.config import Settings
 
-from ...config import Settings
-#from .service import AgentKitService
+# REMOVE these imports to break circular dependency
+# from ...api.dependencies import get_chat_history_manager, get_db_manager
+
 from ...chat.history_manager import ChatHistoryManager
+from ...database.db_manager import DatabaseManager
 from .wallet_provider import PrivyWalletProvider
 
 logger = logging.getLogger(__name__)
@@ -59,105 +60,45 @@ class AgentManager:
     def __init__(self, settings: Settings):
         """Initialize the AgentManager with settings"""
         self.settings = settings
-        #self.service = AgentKitService.get_instance(settings)
         self.sqlite_path = settings.sqlite_db_path or "sqlite:///conversations.db"
         self.wallet_data_dir = settings.wallet_data_dir or "./data/wallets"
-        self.action_providers = self.service.get_action_providers()
+        
+        # Initialize direct instances instead of using getters
+        self.db_manager = DatabaseManager()  # Direct init instead of get_db_manager()
+        self.history_manager = ChatHistoryManager(db_manager=self.db_manager)  # Direct init
+        
         # Initialize PrivyWalletProvider instead of CDP wallet provider
         self.wallet_provider = PrivyWalletProvider.get_instance(settings)
+
+        from .service import AgentKitService
+        self.service = AgentKitService.get_instance(settings)
 
         # Ensure wallet data directory exists
         os.makedirs(self.wallet_data_dir, exist_ok=True)
         
         logger.info("AgentManager initialized with wallet directory: %s", self.wallet_data_dir)
         
-        self.history_manager = get_chat_history_manager()
-        self.db_manager = get_db_manager()
-    
-    # Remove _get_wallet_path, load_wallet_data, and save_wallet_data methods
-    # since they're now handled by the PrivyWalletProvider
-
-
-    # def _get_wallet_path(self, user_id: str) -> str:
-    #     """Get wallet data file path for a user"""
-    #     return os.path.join(self.wallet_data_dir, f"wallet-{user_id}.json")
-    
-    # async def load_wallet_data(self, user_id: str) -> dict:
-    #     """
-    #     Load wallet data for a specific user
-        
-    #     Args:
-    #         user_id: Privy user DID
-            
-    #     Returns:
-    #         Dictionary with wallet data or empty dict if not found
-    #     """
-    #     # Normalize the user ID to handle Privy DIDs
-    #     normalized_user_id = user_id.replace('did:privy:', '')
-        
-    #     wallet_file = self.wallet_data_dir / f"wallet-{self.settings.NETWORK_ID}-{normalized_user_id}.json"
-        
-    #     try:
-    #         if wallet_file.exists():
-    #             with open(wallet_file, 'r') as f:
-    #                 return json.load(f)
-    #         return {}
-    #     except Exception as e:
-    #         logger.error(f"Error loading wallet data for user {user_id}: {str(e)}")
-    #         return {}
-    
-    # async def save_wallet_data(self, user_id: str, wallet_provider: CdpWalletProvider) -> None:
-    #     """Save wallet data for a user"""
-    #     wallet_data_path = self._get_wallet_path(user_id)
-        
-    #     try:
-    #         # Export and save wallet data
-    #         wallet_data = json.dumps(wallet_provider.export_wallet().to_dict())
-    #         with open(wallet_data_path, "w") as f:
-    #             f.write(wallet_data)
-    #         logger.info("Saved wallet data for user %s", user_id)
-    #     except Exception as e:
-    #         logger.error("Error saving wallet data for user %s: %s", user_id, str(e))
-    
     def _normalize_user_id(self, user_id: str) -> str:
         """Normalize Privy user IDs (handles both did:privy: format and regular format)"""
         if user_id and user_id.startswith("did:privy:"):
             return user_id.replace("did:privy:", "")
         return user_id
 
-    async def initialize_agent_for_user(self, user_id: str) -> AgentKit:
-        """Initialize AgentKit with user-specific wallet data"""
-        # Load existing wallet data if available
-        # wallet_data = await self.load_wallet_data(user_id)
-        
-        # # Configure wallet provider
-        # cdp_config = None
-        # if wallet_data:
-        #     cdp_config = CdpWalletProviderConfig(wallet_data=wallet_data)
-        
-        # # Initialize wallet provider
-        # wallet_provider = CdpWalletProvider(cdp_config)
+    def set_action_providers(self, action_providers):
+        """Set action providers for this manager"""
+        self.action_providers = action_providers
+        logger.info(f"Set {len(action_providers)} action providers for AgentManager")
 
-        # Normalize user ID to handle Privy DID format
+    async def initialize_agent_for_user(self, user_id: str) -> AgentKit:
+        """Initialize wallet and return configured AgentKit"""
+        # Normalize user ID
         normalized_user_id = self._normalize_user_id(user_id)
         
-        # Get or create wallet for user via PrivyWalletProvider
+        # Get or create wallet for user
         await self.wallet_provider.get_or_create_wallet(normalized_user_id)
         
-        
-        # Initialize AgentKit with action providers from service
-        agentkit = AgentKit(
-            AgentKitConfig(
-                wallet_provider=self.wallet_provider,
-                action_providers=self.action_providers,
-            )
-        )
-        
-        
-        # # Save updated wallet data
-        # await self.save_wallet_data(user_id, self.wallet_provider)
-        
-        return agentkit
+        # Get shared AgentKit from service - NO NEW INSTANCE
+        return self.service.get_agent_kit()
     
     @contextlib.asynccontextmanager
     async def get_agent_executor(self, user_id: str, session_id: Optional[str] = None) -> AsyncIterator:

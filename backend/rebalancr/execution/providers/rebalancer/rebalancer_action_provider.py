@@ -7,15 +7,22 @@ import asyncio
 from datetime import datetime
 import json
 import logging
-from typing import Dict, List, Any, Optional, Type, Union, cast
+from typing import Dict, List, Any, Optional, Type, Union, cast, TYPE_CHECKING
 from pydantic import BaseModel, Field, root_validator, validator
 from decimal import Decimal
 
 from coinbase_agentkit.action_providers.action_decorator import create_action
 from coinbase_agentkit.action_providers.action_provider import ActionProvider
+from coinbase_agentkit.network import Network
 from coinbase_agentkit.wallet_providers import EvmWalletProvider
 
-from rebalancr.intelligence.intelligence_engine import IntelligenceEngine
+# Use TYPE_CHECKING for circular import prevention
+if TYPE_CHECKING:
+    from rebalancr.intelligence.intelligence_engine import IntelligenceEngine
+else:
+    # For runtime, just use Any
+    IntelligenceEngine = Any
+
 from rebalancr.intelligence.reviewer import TradeReviewer
 from rebalancr.strategy.engine import StrategyEngine
 from rebalancr.performance.analyzer import PerformanceAnalyzer
@@ -52,7 +59,7 @@ class SimulateRebalanceParams(BaseModel):
     user_id: str = "current_user"
     target_allocations: Dict[str, float] = Field(default_factory=dict)
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_allocations(cls, values):
         allocations = values.get('target_allocations', {})
         if not allocations:
@@ -117,7 +124,10 @@ class RebalancerActionProvider(ActionProvider):
         context: Dict[str, Any] = None,
         config: Dict[str, Any] = None
     ):
-        super().__init__()
+        super().__init__(
+            name="rebalancer-action",
+            action_providers=[]
+        )
         self.wallet_provider = wallet_provider
         self.intelligence_engine = intelligence_engine
         self.strategy_engine = strategy_engine

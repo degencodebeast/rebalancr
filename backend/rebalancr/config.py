@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     NETWORK_ID: str = os.getenv("NETWORK_ID", "base-sepolia")
     
     # Privy Server Wallets
-    sqlite_db_path: str = "sqlite:///./data/conversations.db"
+    sqlite_db_path: str = "sqlite:///./data/rebalancr.db"
     wallet_data_dir: str = "./data/wallets"
     
     class Config:

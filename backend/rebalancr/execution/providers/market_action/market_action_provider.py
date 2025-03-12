@@ -9,9 +9,11 @@ from typing import Dict, List, Any, Optional, Type, Union
 from pydantic import BaseModel, Field, validator
 from decimal import Decimal
 
-from coinbase_agentkit.action_provider.provider import ActionProvider, create_action
-from coinbase_agentkit.entity import Action
-from coinbase_agentkit.wallet_provider.evm import EvmWalletProvider
+
+from coinbase_agentkit.action_providers.action_decorator import create_action
+from coinbase_agentkit.action_providers.action_provider import ActionProvider
+from coinbase_agentkit.network import Network
+from coinbase_agentkit.wallet_providers import EvmWalletProvider
 
 from rebalancr.intelligence.allora.client import AlloraClient
 from rebalancr.intelligence.market_analysis import MarketAnalyzer
@@ -90,13 +92,21 @@ class MarketActionProvider(ActionProvider):
         market_condition_classifier: Optional[MarketConditionClassifier] = None,
         config: Dict[str, Any] = None
     ):
-        super().__init__()
+        super().__init__(
+            name="market-action", 
+            action_providers=[]  # Empty list since actions are defined using decorators
+        )
         self.allora_client = allora_client
         self.market_analyzer = market_analyzer
         self.market_data_service = market_data_service
         self.market_condition_classifier = market_condition_classifier
         self.config = config or {}
     
+    @create_action(
+        name="predict-market",
+        description="Get market prediction for an asset combining sentiment and statistical analysis",
+        schema=MarketPredictionParams
+    )
     async def predict_market(self, params: MarketPredictionParams) -> Dict[str, Any]:
         """
         Get market prediction for an asset combining sentiment and statistical analysis
@@ -157,6 +167,11 @@ class MarketActionProvider(ActionProvider):
             logger.error(f"Error getting market prediction: {str(e)}")
             return {"error": f"Failed to get prediction: {str(e)}"}
     
+    @create_action(
+        name="analyze-trend",
+        description="Analyze market trend for an asset over a specified time period",
+        schema=MarketTrendParams
+    )
     async def analyze_trend(self, params: MarketTrendParams) -> Dict[str, Any]:
         """Analyze market trend for an asset"""
         try:
@@ -183,6 +198,11 @@ class MarketActionProvider(ActionProvider):
             logger.error(f"Error analyzing trend: {str(e)}")
             return {"error": f"Failed to analyze trend: {str(e)}"}
     
+    @create_action(
+        name="calculate-volatility",
+        description="Calculate volatility and risk level for an asset",
+        schema=MarketVolatilityParams
+    )
     async def calculate_volatility(self, params: MarketVolatilityParams) -> Dict[str, Any]:
         """Calculate volatility for an asset"""
         try:
@@ -314,27 +334,28 @@ class MarketActionProvider(ActionProvider):
             "reasoning": f"Combined AI sentiment ({sentiment_score}) and statistical signals ({stats_score}) with {time_horizon}-term weights"
         }
 
-# Define the actions using the AgentKit pattern
-predict_market_action = create_action(
-    name="predict-market",
-    description="Get market prediction for an asset combining sentiment and statistical analysis",
-    parameters=MarketPredictionParams,
-    execute_fn=MarketActionProvider.predict_market
-)
-
-analyze_trend_action = create_action(
-    name="analyze-trend",
-    description="Analyze market trend for an asset over a specified time period",
-    parameters=MarketTrendParams,
-    execute_fn=MarketActionProvider.analyze_trend
-)
-
-calculate_volatility_action = create_action(
-    name="calculate-volatility",
-    description="Calculate volatility and risk level for an asset",
-    parameters=MarketVolatilityParams,
-    execute_fn=MarketActionProvider.calculate_volatility
-)
+    def supports_network(self, network: Network) -> bool:
+        """
+        Check if the provider supports the given network
+        
+        Args:
+            network: The network to check support for
+            
+        Returns:
+            Boolean indicating whether the network is supported
+        """
+        # List of supported network IDs or names
+        supported_networks = ["ethereum", "base-mainnet", "base-sepolia", "arbitrum-one"]
+        
+        # Check if the network is supported
+        if isinstance(network, str):
+            return network in supported_networks
+        elif hasattr(network, 'id') or hasattr(network, 'name'):
+            # If network is an object with id or name attribute
+            network_id = getattr(network, 'id', getattr(network, 'name', None))
+            return network_id in supported_networks
+        
+        return False
 
 def market_action_provider(
     allora_client: AlloraClient,

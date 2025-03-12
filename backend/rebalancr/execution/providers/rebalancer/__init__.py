@@ -8,28 +8,16 @@ architecture that combines:
 - Validation layer for trade approval
 """
 
-from .rebalancer_action_provider import (
-    rebalancer_action_provider,
-    analyze_portfolio_action,
-    execute_rebalance_action,
-    simulate_rebalance_action,
-    get_performance_action,
-    RebalancerActionProvider,
-    AnalyzePortfolioParams,
-    ExecuteRebalanceParams,
-    SimulateRebalanceParams,
-    GetPerformanceParams
-)
+# Don't import directly here
+# from .rebalancer_action_provider import (
+#    rebalancer_action_provider,
+#    RebalancerActionProvider
+# )
 
-__all__ = [
-    'rebalancer_action_provider',
-    'analyze_portfolio_action',
-    'execute_rebalance_action',
-    'simulate_rebalance_action',
-    'get_performance_action',
-    'RebalancerActionProvider',
-    'AnalyzePortfolioParams',
-    'ExecuteRebalanceParams',
-    'SimulateRebalanceParams',
-    'GetPerformanceParams'
-] 
+# Instead, expose a function that allows late importing
+def get_rebalancer_provider():
+    from .rebalancer_action_provider import rebalancer_action_provider
+    return rebalancer_action_provider
+
+# Export only the function
+__all__ = ["get_rebalancer_provider"] 

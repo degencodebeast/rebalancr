@@ -4,14 +4,17 @@ import logging
 from datetime import datetime
 
 import pandas as pd
-from rebalancr.intelligence.agent_kit.service import AgentKitService
+# Use TYPE_CHECKING for circular import prevention
+from typing import TYPE_CHECKING
 
 from .allora.client import AlloraClient
 from .allora.models import SentimentAnalysis, FearGreedIndex, MarketManipulation, RebalanceSignal, AssetAnalysisResult
 from .allora.config import get_asset_profile, AlloraConfig
 from .market_analysis import MarketAnalyzer
-from .agent_kit.client import AgentKitClient
 from .market_data import MarketDataAnalyzer
+
+if TYPE_CHECKING:
+    from .agent_kit.client import AgentKitClient
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +32,19 @@ class IntelligenceEngine:
         self, 
         allora_client: AlloraClient,
         market_analyzer: MarketAnalyzer,
-        agent_kit_service: AgentKitService,
-        market_data_service: MarketDataAnalyzer,
-        config: Dict[str, Any]
+        agent_kit_client: Optional['AgentKitClient'] = None,
+        market_data_service: Optional[MarketDataAnalyzer] = None,
+        config: Dict[str, Any] = None,
+        db_manager = None,
+        strategy_engine = None
     ):
         self.allora_client = allora_client
         self.market_analyzer = market_analyzer
-        self.agent_kit_service = agent_kit_service
+        self.agent_kit_client = agent_kit_client
         self.market_data_service = market_data_service
-        self.config = config
+        self.config = config or {}
+        self.db_manager = db_manager  # Will be set later if None
+        self.strategy_engine = strategy_engine  # Will be set later if None
 
         #  # Map of assets to Allora topic IDs
         # self.topic_mappings = {
@@ -56,6 +63,10 @@ class IntelligenceEngine:
         # Performance tracking for self-improvement
         self.performance_history = {}
 
+        # If agent_kit_client is provided, set intelligence_engine reference
+        if self.agent_kit_client:
+            self.agent_kit_client.set_intelligence_engine(self)
+
     #            # Weights for different signals (statistical vs AI)
     #     # Starting with equal weights as Rose Heart suggested
     #     self.signal_weights = {
@@ -72,6 +83,14 @@ class IntelligenceEngine:
     #     historical_data: Dict[str, Any]
     # ) -> Dict[str, Any]:
     
+    def set_db_manager(self, db_manager):
+        """Set the database manager after initialization"""
+        self.db_manager = db_manager
+        
+    def set_strategy_engine(self, strategy_engine):
+        """Set the strategy engine after initialization"""
+        self.strategy_engine = strategy_engine
+        
     async def analyze_portfolio(self, user_id: str, portfolio_id: int) -> Dict[str, Any]:
         """
         Analyze portfolio and determine if rebalancing is needed

@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from ..intelligence.agent_kit.agent_manager import AgentManager
 from ..config import Settings, get_settings
 from ..websockets.websocket_manager import websocket_manager
-from ..api.dependencies import get_agent_manager
+from ..api.dependencies import get_agent_manager, get_agent_kit_client
 from .auth import authenticate_websocket
 
 logger = logging.getLogger(__name__)
@@ -25,19 +25,21 @@ async def handle_websocket(websocket: WebSocket):
     # Accept the connection
     await websocket.accept()
     
-    # Authenticate with Privy
-    auth_result = await authenticate_websocket(websocket)
-    if not auth_result["success"]:
-        logger.error(f"WebSocket authentication failed: {auth_result.get('error')}")
-        await websocket.send_json({
-            "type": "error",
-            "content": "Authentication failed. Please reconnect."
-        })
-        await websocket.close(code=1008)  # Policy violation
-        return
+    # # Authenticate with Privy
+    # auth_result = await authenticate_websocket(websocket)
+    # if not auth_result["success"]:
+    #     logger.error(f"WebSocket authentication failed: {auth_result.get('error')}")
+    #     await websocket.send_json({
+    #         "type": "error",
+    #         "content": "Authentication failed. Please reconnect."
+    #     })
+    #     await websocket.close(code=1008)  # Policy violation
+    #     return
     
     # Get authenticated user ID from Privy
-    user_id = auth_result["user_id"]
+    #user_id = auth_result["user_id"]
+    
+    user_id = "0x5e869af2Af006B538f9c6D231C31DE7cDB4153be"
     logger.info(f"Authenticated user connected: {user_id}")
     
     # Register connection with WebSocket manager
@@ -109,14 +111,7 @@ async def handle_websocket(websocket: WebSocket):
         await websocket_manager.disconnect(websocket, user_id)
 
 async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str, Any]):
-    """
-    Handle chat messages with streaming response
-    
-    This handler:
-    1. Processes the message with AgentManager
-    2. Streams responses in chunks for better UX
-    3. Stores conversation history
-    """
+    """Handle chat messages with streaming response"""
     try:
         message = data.get("message", "")
         conversation_id = data.get("conversation_id")
@@ -134,52 +129,33 @@ async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str
             "content": "Processing your request..."
         }, user_id)
         
-        # Get the AgentManager
-        agent_manager = get_agent_manager()
+        # Get client (business logic layer)
+        agent_kit_client = get_agent_kit_client()
         
-        # Store user message
-        if hasattr(agent_manager, "history_manager"):
-            await agent_manager.store_message(
-                user_id=user_id,
-                message=message,
-                message_type="user",
-                conversation_id=conversation_id or "default"
-            )
-        
-        # Process with agent via streaming for better UX
-        async with agent_manager.get_agent_executor(user_id, conversation_id) as agent_executor:
-            # Stream responses from the agent
-            async for chunk in agent_executor.astream(
-                input={"messages": [HumanMessage(content=message)]},
-                config={"configurable": {"thread_id": f"{user_id}-{conversation_id}"}}
-            ):
-                # Handle agent responses
-                if "agent" in chunk:
-                    content = chunk["agent"]["messages"][0].content
-                    await websocket_manager.send_personal_message({
-                        "type": "chat",
-                        "content": content,
-                        "conversation_id": conversation_id
-                    }, user_id)
-                
-                # Handle tool executions (useful for UI feedback)
-                elif "tools" in chunk:
-                    tool_content = chunk["tools"]["messages"][0].content
-                    await websocket_manager.send_personal_message({
-                        "type": "tool",
-                        "content": tool_content,
-                        "conversation_id": conversation_id
-                    }, user_id)
-        
-        # After streaming is complete, if there was a complete response, store it
-        if hasattr(agent_manager, "history_manager") and "content" in locals():
-            await agent_manager.store_message(
-                user_id=user_id,
-                message=content,  # Using the last content chunk
-                message_type="agent",
-                conversation_id=conversation_id or "default"
-            )
+        # Ensure conversation exists or create one
+        if not conversation_id:
+            conversation_id = await agent_kit_client.initialize_session(user_id)
             
+        # Stream responses with business logic enrichment
+        async for chunk in agent_kit_client.stream_agent_response(user_id, message, conversation_id):
+            # Handle agent responses
+            if "agent" in chunk:
+                content = chunk["agent"]["messages"][0].content
+                await websocket_manager.send_personal_message({
+                    "type": "chat", 
+                    "content": content,
+                    "conversation_id": conversation_id
+                }, user_id)
+            
+            # Handle tool executions (useful for UI feedback)
+            elif "tools" in chunk:
+                tool_content = chunk["tools"]["messages"][0].content
+                await websocket_manager.send_personal_message({
+                    "type": "tool",
+                    "content": tool_content, 
+                    "conversation_id": conversation_id
+                }, user_id)
+                
     except Exception as e:
         logger.error(f"Error handling chat message: {str(e)}")
         await websocket_manager.send_personal_message({

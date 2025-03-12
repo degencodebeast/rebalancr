@@ -3,13 +3,12 @@ import logging
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from rebalancr.api.dependencies import initialize_services
-from rebalancr.websockets.websocket_handlers import handle_chat_websocket
-from rebalancr.execution.action_registry import ActionRegistry
+
 from rebalancr.tasks.background_tasks import monitor_portfolios
 
 from ..database.db_manager import DatabaseManager
 from ..intelligence.agent_kit.wallet_provider import get_wallet_provider
-from ..intelligence.agent_kit.chat_agent import PortfolioAgent
+
 from ..intelligence.allora.client import AlloraClient
 from ..chat.history_manager import ChatHistoryManager
 from ..websockets.websocket_handlers import handle_websocket
@@ -22,8 +21,8 @@ from ..intelligence.intelligence_engine import IntelligenceEngine
 from ..intelligence.market_analysis import MarketAnalyzer
 from ..intelligence.agent_kit.client import AgentKitClient
 from coinbase_agentkit import AgentKit, AgentKitConfig
-from ..intelligence.agent_kit.trade_agent import TradeAgent
-from .routes import auth, chat_routes, websocket_routes, wallet_routes
+
+#from .routes import auth, chat_routes, websocket_routes, wallet_routes
 from ..config import get_settings
 from ..intelligence.agent_kit.service import AgentKitService
 from ..config import Settings
@@ -64,14 +63,14 @@ async def websocket_endpoint(websocket: WebSocket):
     await handle_websocket(websocket)
 
 # Include routers
-app.include_router(auth.router)
-app.include_router(chat_routes.router)
-app.include_router(websocket_routes.router, tags=["websocket"])
-app.include_router(wallet_routes.router)
+#app.include_router(auth.router)
+#app.include_router(chat_routes.router)
+#app.include_router(websocket_routes.router, tags=["websocket"])
+#app.include_router(wallet_routes.router)
 
 
 # At the end of your app initialization
-@app.lifespan("startup")
+@app.on_event("startup")
 async def startup_event():
     """Initialize the database and run migrations"""
     await app.state.db_manager.initialize()
@@ -83,7 +82,7 @@ async def startup_event():
         app.state.strategy_engine
     )
 
-@app.lifespan("shutdown")
+@app.on_event("shutdown")
 async def shutdown_db():
     """Close database connections on shutdown"""
     await app.state.db_manager.close()

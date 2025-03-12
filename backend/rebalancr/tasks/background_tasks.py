@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from ..database.db_manager import DatabaseManager
-from ..intelligence.strategy_engine import StrategyEngine
+from ..strategy.engine import StrategyEngine
 
 logger = logging.getLogger(__name__)
 
