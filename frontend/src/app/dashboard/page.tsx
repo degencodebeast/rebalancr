@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
 import { usePrivy } from '@privy-io/react-auth'
 import { Textarea, Paper, ScrollArea, Avatar } from '@mantine/core'
@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import LogoImg from '../../../public/rebalancr_black.webp'
 import Image from 'next/image'
+import { useWebSocketWithAuth } from '@/hooks/useWebSocketWithAuth'
 
 // Message type definition
 interface Message {
@@ -23,113 +24,35 @@ interface Message {
 
 export default function Dashboard() {
   const { user } = usePrivy()
-  const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
-  const [wsConnected, setWsConnected] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const welcomeMessageShownRef = useRef(false)
-
-  // Connect to WebSocket
+  
+  // Use our custom hook for WebSocket communication
+  const { 
+    isConnected, 
+    isAuthenticated, 
+    isAuthenticating, 
+    error, 
+    messages, 
+    sendMessage 
+  } = useWebSocketWithAuth()
+  
+  // Add welcome message
   useEffect(() => {
-    // const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws")
-    const ws = new WebSocket('ws://localhost:8000/ws')
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      console.log('WebSocket connected')
-      setWsConnected(true)
-
-      // Send initial message to get any existing data
-      ws.send(JSON.stringify({ type: 'get_portfolio' }))
-    }
-
-    ws.onmessage = (event) => {
-      let data
-      try {
-        data = JSON.parse(event.data)
-        console.log('Received message:', data)
-      } catch (e) {
-        console.error(
-          'Failed to parse websocket message as JSON, using raw data instead:',
-          e,
-        )
-        data = { content: event.data } // Fall back to raw text
-      }
-      console.log('Received message content:', data.content)
-
-      // If data.content exists, treat it as a chat message
-      if (data.content) {
-        addMessage({
-          id: `assistant-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 9)}`,
-          sender: 'assistant',
-          content: data.content,
-          timestamp: new Date(),
-        })
-      }
-    }
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected')
-      setWsConnected(false)
-    }
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-    }
-
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close()
-      }
-    }
-  }, [])
-
-  // Create a separate useEffect for the welcome message
-  // useEffect(() => {
-  //   //Add welcome message only once
-  //   if (!welcomeMessageShownRef.current && messages.length === 0) {
-  //     setTimeout(() => {
-  //       addMessage({
-  //         id: `welcome-${Date.now()}-${Math.random()
-  //           .toString(36)
-  //           .substring(2, 9)}`,
-  //         sender: 'assistant',
-  //         content:
-  //           'Hi Anon, you are about to start chatting with rebalancr. An AI automated portfolio management system predicting optimal assets allocation to ensure maximum profits and to cut loses.',
-  //         timestamp: new Date(),
-  //       })
-  //       welcomeMessageShownRef.current = true
-  //     }, 1000)
-  //   }
-  // }, [])
-
-  useEffect(() => {
-    if (!welcomeMessageShownRef.current) {
+    if (!welcomeMessageShownRef.current && isAuthenticated && messages.length === 0) {
       setTimeout(() => {
-        setMessages((prev) => {
-          if (prev.length === 0) {
-            welcomeMessageShownRef.current = true
-            return [
-              ...prev,
-              {
-                id: `welcome-${Date.now()}-${Math.random()
-                  .toString(36)
-                  .substring(2, 9)}`,
-                sender: 'assistant',
-                content:
-                  'Hi Anon, you are about to start chatting with rebalancr. An AI automated portfolio management system predicting optimal assets allocation to ensure maximum profits and to cut loses.',
-                timestamp: new Date(),
-              },
-            ]
-          }
-          return prev
-        })
-      }, 1000)
+        const welcomeMessage = {
+          id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          sender: 'assistant' as const,
+          content: 'Hi Anon, you are about to start chatting with rebalancr. An AI automated portfolio management system predicting optimal assets allocation to ensure maximum profits and to cut loses.',
+          timestamp: new Date(),
+        };
+        // The addLocalMessage functionality is now handled within the hook's sendMessage
+        welcomeMessageShownRef.current = true;
+      }, 1000);
     }
-  }, [])
+  }, [isAuthenticated, messages.length]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -137,50 +60,46 @@ export default function Dashboard() {
       viewportRef.current.scrollTo({
         top: viewportRef.current.scrollHeight,
         behavior: 'smooth',
-      })
+      });
     }
-  }, [messages])
-
-  const addMessage = (message: Message) => {
-    setMessages((prev) => [...prev, message])
-  }
+  }, [messages]);
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim()) return
-
-    // Add user message to chat
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      content: inputMessage,
-      timestamp: new Date(),
-    }
-    addMessage(userMessage)
-
-    // Send message to server
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'chat_message',
-          content: inputMessage,
-          userId: user?.wallet?.address,
-        }),
-      )
-    }
-
-    setInputMessage('')
-  }
+    if (!inputMessage.trim() || !isConnected || !isAuthenticated) return;
+    
+    // Send message using our hook
+    sendMessage(inputMessage);
+    
+    // Clear input
+    setInputMessage('');
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+      e.preventDefault();
+      handleSendMessage();
     }
-  }
+  };
+
+  // Show authentication status
+  const getStatusMessage = () => {
+    if (error) return `Error: ${error}`;
+    if (isAuthenticating) return 'Authenticating...';
+    if (!isConnected) return 'Connecting...';
+    if (!isAuthenticated) return 'Waiting for authentication...';
+    return 'Connected';
+  };
 
   return (
     <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-80px)] py-4 md:px-4">
+        {/* Connection status indicator */}
+        {(!isConnected || !isAuthenticated || isAuthenticating || error) && (
+          <div className={`mb-4 p-2 text-center rounded-md ${error ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+            {getStatusMessage()}
+          </div>
+        )}
+        
         {/* Chat messages area */}
         <ScrollArea
           className="flex-grow px-2 py-4 md:px-4 chat-container bg-white md:rounded-lg shadow-sm border border-[#f1f1f1]"
@@ -237,17 +156,18 @@ export default function Dashboard() {
         <div className="pt-4 px-2 md:px-0">
           <Textarea
             className="flex-grow chat-input"
-            placeholder="Type your prompt here..."
+            placeholder={isAuthenticated ? "Type your prompt here..." : "Waiting for connection..."}
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyPress}
             autosize
             maxRows={8}
             minRows={1}
+            disabled={!isAuthenticated}
             rightSection={
               <Button
                 onClick={handleSendMessage}
-                disabled={!wsConnected || !inputMessage.trim()}
+                disabled={!isAuthenticated || !inputMessage.trim()}
                 variant="default"
                 className="flex items-center gap-2"
               >
@@ -259,5 +179,5 @@ export default function Dashboard() {
         </div>
       </div>
     </DashboardLayout>
-  )
+  );
 }
