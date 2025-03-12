@@ -3,6 +3,7 @@
 from typing import Any, Dict, Optional, Union
 from decimal import Decimal
 
+from fastapi import logger
 from web3 import Web3
 from web3.types import Wei
 
@@ -72,69 +73,67 @@ async def get_token_balance(wallet_provider: EvmWalletProvider, token_address: s
     except Exception as e:
         return 0
 
-async def approve_token(
-    wallet_provider: EvmWalletProvider,
-    token_address: str,
-    spender_address: str,
-    amount: Union[int, Wei],
-    check_allowance: bool = True
-) -> Optional[str]:
-    """Approve token spending
+async def approve_token(wallet_provider: EvmWalletProvider, token_address: str, spender_address: str, amount: int) -> Dict[str, Any]:
+    """Approve a spender to use tokens
     
     Args:
         wallet_provider: The wallet provider
-        token_address: The token address
-        spender_address: The address to approve
-        amount: The amount to approve
-        check_allowance: Whether to check existing allowance before approving
+        token_address: The address of the token to approve
+        spender_address: The address of the spender to approve
+        amount: The amount to approve in wei
         
     Returns:
-        Transaction hash if approval was needed, None otherwise
+        Transaction receipt
+        
+    Raises:
+        Exception: If the approval transaction fails
     """
     # Native ETH doesn't need approval
     if token_address == "0x0000000000000000000000000000000000000000":
         return None
-    
-    # Create contract instance
-    contract = wallet_provider._web3.eth.contract(
-        address=Web3.to_checksum_address(token_address),
-        abi=ERC20_ABI
-    )
-    
-    # Check if we already have sufficient allowance
-    if check_allowance:
-        existing_allowance = contract.functions.allowance(
-            wallet_provider.get_address(),
-            spender_address
-        ).call()
         
-        if existing_allowance >= amount:
-            return None
-    
-    # Encode approve function call
-    encoded_data = contract.encodeABI(
-        fn_name="approve",
-        args=[spender_address, amount]
-    )
-    
-    # Prepare transaction
-    tx_params = {
-        "to": token_address,
-        "data": encoded_data,
-        "value": 0
-    }
-    
-    # Send transaction
-    tx_hash = wallet_provider.send_transaction(tx_params)
-    
-    # Wait for transaction receipt
-    receipt = wallet_provider.wait_for_transaction_receipt(tx_hash)
-    
-    # Return tx hash if successful
-    if receipt['status'] == 1:
-        return tx_hash
-    else:
-        raise Exception(f"Token approval failed: {tx_hash}")
+    try:
+        # Create token contract
+        contract = Web3().eth.contract(address=token_address, abi=ERC20_ABI)
+        
+        # Encode the approve function call
+        encoded_data = contract.encodeABI(
+            fn_name="approve",
+            args=[spender_address, amount]
+        )
+        
+        # Prepare transaction
+        tx_params = {
+            "to": token_address,
+            "data": encoded_data,
+        }
+        
+        # Send transaction
+        tx_hash = wallet_provider.send_transaction(tx_params)
+        
+        # Wait for receipt and return it
+        receipt = wallet_provider.wait_for_transaction_receipt(tx_hash)
+        
+        if receipt["status"] != 1:
+            raise Exception(f"Approval transaction failed with hash: {tx_hash}")
+            
+        return receipt
+    except Exception as e:
+        raise Exception(f"Error approving token: {str(e)}")
+
+async def estimate_gas_with_buffer(
+    tx_params: Dict[str, Any],
+    buffer_percentage: float = 20.0
+) -> int:
+    """Estimate gas with buffer"""
+    try:
+        gas_estimate = Web3().eth.estimate_gas(tx_params)
+        # Add buffer for safety
+        return int(gas_estimate * (1 + buffer_percentage / 100))
+    except Exception as e:
+        # Fallback to default gas limit
+        logger.warning(f"Error estimating gas: {str(e)}")
+        return 500000  # Default gas limit
 
 
 

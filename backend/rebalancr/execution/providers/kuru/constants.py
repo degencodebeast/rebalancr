@@ -1,51 +1,67 @@
-# # Supported networks by Kuru
-# SUPPORTED_NETWORKS = {
-#     1: "Ethereum",
-#     8453: "Base",
-#     84532: "Base Sepolia",
-# }
-
-# # Default RPC URLs by chain ID
-# DEFAULT_RPC_URLS = {
-#     1: "https://ethereum.public-rpc.com",
-#     8453: "https://base.publicnode.com",
-#     84532: "https://sepolia.base.org",
-# }
-
-# # Token addresses on different networks
-# TOKEN_ADDRESSES = {
-#     8453: {  # Base
-#         "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-#         "ETH": "0x0000000000000000000000000000000000000000",
-#         # Add more tokens as needed
-#     },
-#     84532: {  # Base Sepolia
-#         "USDC": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-#         "ETH": "0x0000000000000000000000000000000000000000",
-#         # Add more tokens as needed
-#     }
-# }
-
 """Constants for Kuru action provider."""
+import json
+import os
+from pathlib import Path
 
-# Default RPC URLs for supported networks
-DEFAULT_RPC_URLS = {
-    8453: "https://base-mainnet.public.blastapi.io",
-    84532: "https://sepolia.base.org"
-}
+# Load ABI from JSON file
+def load_abi(filename):
+    """Load ABI from JSON file"""
+    current_dir = Path(__file__).parent
+    abi_path = current_dir / "abis" / filename
+    try:
+        with open(abi_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load ABI file {filename}: {e}")
+        return []
 
-# Token addresses
-TOKEN_ADDRESSES = {
-        "ETH": "0x0000000000000000000000000000000000000000",
-    "WETH": {
-        8453: "0x4200000000000000000000000000000000000006",
-        84532: "0x4200000000000000000000000000000000000006"
-    },
-    "USDC": {
-        8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        84532: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+# Contract addresses for Monad testnet (chain_id: 10143)
+KURU_CONTRACT_ADDRESSES = {
+    10143: {  # Monad testnet
+        "ROUTER": "0xc816865f172d640d93712C68a7E1F83F3fA63235",
+        "MARGIN_ACCOUNT": "0x4B186949F31FCA0aD08497Df9169a6bEbF0e26ef",
+        "KURU_FORWARDER": "0x350678D87BAa7f513B262B7273ad8Ccec6FF0f78",
+        "KURU_DEPLOYER": "0x67a4e43C7Ce69e24d495A39c43489BC7070f009B",
+        "KURU_UTILS": "0x9E50D9202bec0D046a75048Be8d51bBa93386Ade"
     }
 }
+
+# Market addresses for Monad testnet
+KURU_MARKET_ADDRESSES = {
+    10143: {  # Monad testnet
+        "MON_USDC": "0xd3af145f1aa1a471b5f0f62c52cf8fcdc9ab55d3",
+        "DAK_MON": "0x94b72620e65577de5fb2b8a8b93328caf6ca161b"
+    }
+}
+
+# Token addresses for Monad testnet
+TOKEN_ADDRESSES = {
+    "ETH": "0x0000000000000000000000000000000000000000",
+    "WETH": {
+        10143: "0x4200000000000000000000000000000000000006"
+    },
+    "USDC": {
+        10143: "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"
+    },
+    "kUSDC": {
+        10143: "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"
+    },
+    "USDT": {
+        10143: "0x88b8E2161DEDC77EF4ab7585569D2415a1C1055D"
+    },
+    "DAK": {
+        10143: "0x0F0BDEbF0F83cD1EE3974779Bcb7315f9808c714"
+    }
+}
+
+# Load ABIs from existing JSON files in the abis directory
+MARGIN_ACCOUNT_ABI = load_abi('margin_account.json')
+KURU_MARKET_ABI = load_abi('order_book.json')
+KURU_FORWARDER_ABI = load_abi('kuru_forwarder.json')
+IERC20_ABI = load_abi('ierc20.json')
+
+# Aliases for compatibility
+ERC20_ABI = IERC20_ABI
 
 # Kuru Market ABI (simplified example - this would need to be filled with actual ABI)
 KURU_MARKET_ABI = [
