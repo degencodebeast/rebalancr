@@ -9,6 +9,7 @@ from rebalancr.database.db_manager import DatabaseManager
 from rebalancr.intelligence.agent_kit.wallet_provider import get_wallet_provider
 from rebalancr.config import settings
 
+
 # Initialize router
 router = APIRouter(
     prefix="/auth",

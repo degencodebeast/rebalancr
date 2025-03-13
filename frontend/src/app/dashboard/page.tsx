@@ -41,7 +41,7 @@ export default function Dashboard() {
       setWsConnected(true)
 
       // Send initial message to get any existing data
-      ws.send(JSON.stringify({ type: 'get_portfolio' }))
+      //ws.send(JSON.stringify({ type: 'get_portfolio' }))
     }
 
     ws.onmessage = (event) => {
