@@ -267,7 +267,7 @@ async def test_sign_transaction():
         'chainId': 84532,
         'type': 2,  # EIP-1559 transaction
         'gas_limit': "0x5208",  # Standard ETH transfer
-        'nonce': 100,  # This might need to be obtained dynamically
+        'nonce': 1,  # This might need to be obtained dynamically
         'max_fee_per_gas': "0x14bf7dadac",
         'max_priority_fee_per_gas': "0xf4240"
     }

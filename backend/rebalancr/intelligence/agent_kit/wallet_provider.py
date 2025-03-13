@@ -513,7 +513,7 @@ class PrivyWalletProvider(EvmWalletProvider):
             headers = self._get_auth_headers()
             
             # Get chain ID in CAIP2 format
-            chain_id = 84532  # Base Sepolia chain ID
+            chain_id = 10143  # Monad testnet chain ID
             caip2 = f"eip155:{chain_id}"
             
             # Format the payload according to Privy API requirements

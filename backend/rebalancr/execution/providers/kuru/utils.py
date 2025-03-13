@@ -1,28 +1,68 @@
 """Utility functions for Kuru action provider."""
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List, Tuple
 from decimal import Decimal
 
-from fastapi import logger
+import logging
 from web3 import Web3
 from web3.types import Wei
 
 from coinbase_agentkit.wallet_providers import EvmWalletProvider
-from .constants import ERC20_ABI, TOKEN_ADDRESSES
+from .constants import ERC20_ABI, TOKEN_ADDRESSES, MARKET_ADDRESSES, NETWORK_ID_TO_CHAIN_ID
 
-def get_token_address(token_symbol: str, chain_id: int) -> str:
-    """Get token address from symbol"""
-    if token_symbol.upper() == "ETH":
+# Set up logging
+logger = logging.getLogger(__name__)
+
+def get_token_address(network_id: str, token_id: str) -> str:
+    """Get token address from token ID for a specific network
+    
+    Args:
+        network_id: Network ID (e.g., "monad-testnet")
+        token_id: Token ID (e.g., "usdc", "native")
+        
+    Returns:
+        Token address
+        
+    Raises:
+        ValueError: If token not found
+    """
+    # Native token has a special address
+    if token_id.lower() == "native":
         return "0x0000000000000000000000000000000000000000"
     
-    token_address = TOKEN_ADDRESSES.get(token_symbol.upper(), {}).get(chain_id)
-    if not token_address:
-        raise ValueError(f"Unknown token symbol {token_symbol} for chain {chain_id}")
-    
-    return token_address
+    try:
+        return TOKEN_ADDRESSES[network_id][token_id.lower()]
+    except KeyError:
+        raise ValueError(f"Unknown token: {token_id} for network {network_id}")
 
-def format_token_amount(amount: Union[str, int, float, Decimal], decimals: int = 18) -> int:
-    """Format token amount to wei"""
+def get_market_address(network_id: str, market_id: str) -> str:
+    """Get market address from market ID for a specific network
+    
+    Args:
+        network_id: Network ID (e.g., "monad-testnet")
+        market_id: Market ID (e.g., "mon-usdc")
+        
+    Returns:
+        Market address
+        
+    Raises:
+        ValueError: If market not found
+    """
+    try:
+        return MARKET_ADDRESSES[network_id][market_id.lower()]
+    except KeyError:
+        raise ValueError(f"Unknown market: {market_id} for network {network_id}")
+
+def format_amount_with_decimals(amount: Union[str, int, float, Decimal], decimals: int = 18) -> int:
+    """Format human-readable amount to wei
+    
+    Args:
+        amount: Amount in human-readable format (e.g., "1.5")
+        decimals: Token decimals
+        
+    Returns:
+        Amount in wei
+    """
     if isinstance(amount, str):
         amount = Decimal(amount)
     
@@ -31,6 +71,82 @@ def format_token_amount(amount: Union[str, int, float, Decimal], decimals: int =
     
     # Convert to wei
     return int(amount * Decimal(10) ** Decimal(decimals))
+
+def format_amount_from_decimals(amount: int, decimals: int = 18) -> str:
+    """Format wei amount to human-readable format
+    
+    Args:
+        amount: Amount in wei
+        decimals: Token decimals
+        
+    Returns:
+        Human-readable amount
+    """
+    # Convert from wei
+    return str(Decimal(amount) / Decimal(10) ** Decimal(decimals))
+
+def get_token_symbol(wallet_provider: EvmWalletProvider, token_address: str) -> str:
+    """Get token symbol
+    
+    Args:
+        wallet_provider: Wallet provider
+        token_address: Token address
+        
+    Returns:
+        Token symbol
+    """
+    # Native token
+    if token_address == "0x0000000000000000000000000000000000000000":
+        network = wallet_provider.get_network()
+        # Return appropriate symbol based on network
+        if network.network_id.startswith("monad"):
+            return "MON"
+        return "ETH"
+    
+    try:
+        # Create contract instance
+        contract = wallet_provider._web3.eth.contract(
+            address=Web3.to_checksum_address(token_address),
+            abi=ERC20_ABI
+        )
+        
+        # Call symbol function
+        return contract.functions.symbol().call()
+    except Exception as e:
+        logger.warning(f"Error getting token symbol: {str(e)}")
+        return "UNKNOWN"
+
+def get_portfolio_summary(wallet_provider: EvmWalletProvider, market_address: str) -> str:
+    """Get portfolio summary in markdown format
+    
+    Args:
+        wallet_provider: Wallet provider
+        market_address: Market address
+        
+    Returns:
+        Markdown-formatted portfolio summary
+    """
+    # This would be a more complex implementation for Kuru
+    # Similar to Compound's get_portfolio_details_markdown
+    
+    address = wallet_provider.get_address()
+    
+    # This is a simplified version - you would need to expand this
+    # based on Kuru's specific contract interactions
+    
+    return f"""
+## Kuru Portfolio Summary
+
+### Wallet Address
+{address}
+
+### Balances
+*Currently not available for this market*
+
+### Open Orders
+*Currently not available for this market*
+
+"""
 
 def get_token_decimals(wallet_provider: EvmWalletProvider, token_address: str) -> int:
     """Get token decimals"""
@@ -58,6 +174,7 @@ def get_token_balance(wallet_provider: EvmWalletProvider, token_address: str) ->
     
     # For ETH, get balance from web3
     if token_address == "0x0000000000000000000000000000000000000000":
+        #wallet_provider.get_balance(address)
         return wallet_provider._web3.eth.get_balance(address)
     
     # For ERC20 tokens, call balanceOf
@@ -135,9 +252,71 @@ def estimate_gas_with_buffer(
         logger.warning(f"Error estimating gas: {str(e)}")
         return 500000  # Default gas limit
 
+# Additional market helper functions
 
+def get_market_tokens(network_id: str, market_id: str) -> Tuple[str, str]:
+    """Get base and quote token IDs for a market
+    
+    Args:
+        network_id: Network ID
+        market_id: Market ID
+        
+    Returns:
+        Tuple of (base_token_id, quote_token_id)
+    """
+    # Parse market ID to get tokens
+    # For example, "mon-usdc" would return ("native", "usdc")
+    parts = market_id.lower().split("-")
+    
+    if len(parts) == 2:
+        # Standard format like "mon-usdc"
+        if parts[0] == "mon":
+            base_token = "native"
+        else:
+            base_token = parts[0]
+            
+        quote_token = parts[1]
+        return (base_token, quote_token)
+    else:
+        # Handle formats like "chog-mon"
+        if parts[1] == "mon":
+            quote_token = "native"
+        else:
+            quote_token = parts[1]
+            
+        base_token = parts[0]
+        return (base_token, quote_token)
 
-
+def get_token_name(wallet_provider: EvmWalletProvider, token_address: str) -> str:
+    """Get token name
+    
+    Args:
+        wallet_provider: Wallet provider
+        token_address: Token address
+        
+    Returns:
+        Token name
+    """
+    # Native token
+    if token_address == "0x0000000000000000000000000000000000000000":
+        network = wallet_provider.get_network()
+        # Return appropriate name based on network
+        if network.network_id.startswith("monad"):
+            return "Monad"
+        return "Ethereum"
+    
+    try:
+        # Create contract instance
+        contract = wallet_provider._web3.eth.contract(
+            address=Web3.to_checksum_address(token_address),
+            abi=ERC20_ABI
+        )
+        
+        # Call name function
+        return contract.functions.name().call()
+    except Exception as e:
+        logger.warning(f"Error getting token name: {str(e)}")
+        return "Unknown Token"
 
 # from typing import Optional, Dict, Any
 # from decimal import Decimal
