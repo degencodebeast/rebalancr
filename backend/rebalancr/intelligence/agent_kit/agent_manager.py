@@ -95,9 +95,9 @@ class AgentManager:
         normalized_user_id = self._normalize_user_id(user_id)
         
         # Get or create wallet for user
-        await self.wallet_provider.get_or_create_wallet(normalized_user_id)
+        wallet = await self.wallet_provider.get_or_create_wallet(normalized_user_id)
+        logger.info(f"Wallet ready for user {user_id}: {wallet.get('address')}")
         
-        logger.info(f"Initialized agent wallet for user {user_id}")
         # Get shared AgentKit from service - NO NEW INSTANCE
         return self.service.get_agent_kit()
     

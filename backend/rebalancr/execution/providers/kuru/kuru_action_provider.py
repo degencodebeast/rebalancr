@@ -18,12 +18,13 @@ from .constants import TOKEN_ADDRESSES, DEFAULT_RPC_URLS, KURU_MARKET_ABI, KURU_
 from .utils import approve_token, get_token_address, format_token_amount
 
 # Define supported networks consistently with other providers
-SUPPORTED_NETWORKS = ["base-mainnet", "base-sepolia"]
+SUPPORTED_NETWORKS = ["base-mainnet", "base-sepolia", "monad-testnet"]
 
 # Network ID to Chain ID mapping
 NETWORK_ID_TO_CHAIN_ID = {
     "base-mainnet": 8453,
-    "base-sepolia": 84532
+    "base-sepolia": 84532,
+    "monad-testnet": 10143
 }
 
 class KuruActionProvider(ActionProvider[EvmWalletProvider]):
@@ -34,25 +35,25 @@ class KuruActionProvider(ActionProvider[EvmWalletProvider]):
                  ws_url: Optional[str] = None,
                  margin_account_by_chain: Optional[Dict[int, str]] = None,
                  kuru_router_addresses: Optional[Dict[int, str]] = None):
-        super().__init__("kuru", SUPPORTED_NETWORKS)
+        super().__init__("kuru", [])
         
         # Initialize Web3 providers dictionary
         self.web3_providers: Dict[int, Web3] = {}
         
         # Set configuration values
         self.rpc_url_by_chain_id = rpc_url_by_chain_id or DEFAULT_RPC_URLS
+        #self.rpc_url_by_chain_id = DEFAULT_RPC_URLS
         self.ws_url = ws_url
         self.margin_account_by_chain = margin_account_by_chain or {}
         
         # Store Kuru router addresses
         self.kuru_router_addresses = kuru_router_addresses or {
-            8453: "0x05e6f736b5dedd60693fa806ce353156a1b73cf3",  # Example address for Base Mainnet
-            84532: "0x05e6f736b5dedd60693fa806ce353156a1b73cf3"  # Example address for Base Sepolia
+            10143: "0xc816865f172d640d93712C68a7E1F83F3fA63235"  # Example address for Monad Testnet
         }
     
     def supports_network(self, network: Network) -> bool:
         """Check if this provider supports the given network"""
-        return network.network_id in SUPPORTED_NETWORKS
+        return network.protocol_family == "evm" and network.network_id in SUPPORTED_NETWORKS
     
     def _initialize_web3(self, chain_id: int) -> bool:
         """Initialize Web3 provider for specified chain if not already done"""

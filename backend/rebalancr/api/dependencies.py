@@ -260,7 +260,7 @@ def initialize_intelligence_services():
     
     # 6. Initialize agent client
     from ..intelligence.agent_kit.client import AgentKitClient
-    agent_kit_client = AgentKitClient(config, agent_manager=agent_manager)
+    agent_kit_client = AgentKitClient.get_instance(config, agent_manager=agent_manager)
     
     # 7. Initialize strategy engine
     strategy_engine = get_strategy_engine()

@@ -52,7 +52,7 @@ class PrivyWalletProvider(EvmWalletProvider):
     def __init__(self, config=None):
         """Initialize the Privy wallet provider"""
         # Get settings from config or environment
-        settings = config or get_settings()
+        settings = get_settings()
         
         # Initialize configuration
         if not config:

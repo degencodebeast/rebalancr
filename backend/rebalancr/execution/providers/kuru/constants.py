@@ -30,16 +30,14 @@ KURU_CONTRACT_ADDRESSES = {
 KURU_MARKET_ADDRESSES = {
     10143: {  # Monad testnet
         "MON_USDC": "0xd3af145f1aa1a471b5f0f62c52cf8fcdc9ab55d3",
-        "DAK_MON": "0x94b72620e65577de5fb2b8a8b93328caf6ca161b"
+        "DAK_MON": "0x94b72620e65577de5fb2b8a8b93328caf6ca161b",
+        "CHOG-MON": "0x277bf4a0aac16f19d7bf592feffc8d2d9a890508",
+        "YAKI-MON": "0xd5c1dc181c359f0199c83045a85cd2556b325de0"
     }
 }
 
 # Token addresses for Monad testnet
-TOKEN_ADDRESSES = {
-    "ETH": "0x0000000000000000000000000000000000000000",
-    "WETH": {
-        10143: "0x4200000000000000000000000000000000000006"
-    },
+TOKEN_ADDRESSES = {    
     "USDC": {
         10143: "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"
     },
@@ -51,6 +49,12 @@ TOKEN_ADDRESSES = {
     },
     "DAK": {
         10143: "0x0F0BDEbF0F83cD1EE3974779Bcb7315f9808c714"
+    },
+    "CHOG": {
+        10143: "0xE0590015A873bF326bd645c3E1266d4db41C4E6B"
+    },
+    "YAKI": {
+        10143: "0xfe140e1dCe99Be9F4F15d657CD9b7BF622270C50"
     }
 }
 
@@ -259,5 +263,5 @@ DEFAULT_RPC_URLS = {
     "421613": "https://goerli-rollup.arbitrum.io/rpc",  # Arbitrum Goerli
     "1": "https://eth.llamarpc.com",  # Ethereum Mainnet
     "5": "https://rpc.ankr.com/eth_goerli",  # Ethereum Goerli
-    "535037": "https://rpc.testnet.monad.xyz",  # Monad Testnet
+    "10143": "https://testnet.rpc.monad.xyz",  # Monad Testnet
 }

@@ -539,13 +539,13 @@ test = ["coverage (>=7)", "hypothesis", "pytest"]
 
 [[package]]
 name = "cdp-sdk"
-version = "0.17.0"
+version = "0.21.0"
 description = "CDP Python SDK"
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "cdp_sdk-0.17.0-py3-none-any.whl", hash = "sha256:7fc886fc9556dca4085d0891e04f7ad303bcf1d3714f57cdef00a2a84782b33a"},
-    {file = "cdp_sdk-0.17.0.tar.gz", hash = "sha256:b2dfb03675c57994033d4b7d089ab6b85c56f0e437a6b4812f1d6332c2a7ac5f"},
+    {file = "cdp_sdk-0.21.0-py3-none-any.whl", hash = "sha256:36a2ec372c79354133f142566674f6f5a21f474d31f378154a3b4e0e0089818a"},
+    {file = "cdp_sdk-0.21.0.tar.gz", hash = "sha256:6d832189e84cec76c3353f52835ddf06789630325ca5f0ea1a48ad663b698e7d"},
 ]
 
 [package.dependencies]
@@ -868,17 +868,17 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
 name = "coinbase-agentkit"
-version = "0.1.3"
+version = "0.1.6"
 description = "Coinbase AgentKit"
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "coinbase_agentkit-0.1.3-py3-none-any.whl", hash = "sha256:78b45cc830efb64080e60c7a50f207a105434effe9029e1f7321360bcc522052"},
-    {file = "coinbase_agentkit-0.1.3.tar.gz", hash = "sha256:9dd15229eda9caf68a68d9834bed0dc0106a4b3d5f0664372ac69402fbbf4fce"},
+    {file = "coinbase_agentkit-0.1.6-py3-none-any.whl", hash = "sha256:5665a7ef8f5591f95cabf3884332e6926151f485b30ccd3138a75b8407ca4a92"},
+    {file = "coinbase_agentkit-0.1.6.tar.gz", hash = "sha256:2252cc8448db8e0fb3c5ef1a039b0a62d33e9930a7210e0594b71ff484044454"},
 ]
 
 [package.dependencies]
-cdp-sdk = "0.17.0"
+cdp-sdk = "0.21.0"
 pydantic = ">=2.0,<3.0"
 python-dotenv = ">=1.0.1,<2.0.0"
 requests = ">=2.31.0,<3.0.0"
@@ -4521,4 +4521,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "f88a6830c2dd1ecaf150348d5890c53630fbc123f360b5798dde7261ab153056"
+content-hash = "ade8818bde1fe377155245355cfcbd73600f64f3a7fd5a8d0b50be924853bbd1"

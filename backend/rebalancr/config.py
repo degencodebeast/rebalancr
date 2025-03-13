@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     }
     
     # External APIs
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
@@ -148,7 +148,7 @@ REVIEWER_CONFIG = {
 ALLORA_API_KEY: str = os.getenv("ALLORA_API_KEY")
 
 # Supported networks
-SUPPORTED_NETWORKS = [1, 56, 137, 42161, 10]  # Ethereum, BSC, Polygon, Arbitrum, Optimism
+SUPPORTED_NETWORKS = [1, 56, 137, 42161, 10, 10143]  # Ethereum, BSC, Polygon, Arbitrum, Optimism, Monad
 
 # Network RPC URLs
 NETWORK_RPC_URLS = {
@@ -156,7 +156,8 @@ NETWORK_RPC_URLS = {
     56: os.environ.get("BSC_RPC_URL", ""),
     137: os.environ.get("POLYGON_RPC_URL", ""),
     42161: os.environ.get("ARBITRUM_RPC_URL", ""),
-    10: os.environ.get("OPTIMISM_RPC_URL", "")
+    10: os.environ.get("OPTIMISM_RPC_URL", ""),
+    10143: os.environ.get("MONAD_RPC_URL", "")
 }
 
 # Database configuration

@@ -8,6 +8,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_deepseek import ChatDeepSeek
 
 from coinbase_agentkit_langchain import get_langchain_tools
+from langchain_openai import ChatOpenAI
 from rebalancr.execution.providers.kuru import kuru_action_provider
 from rebalancr.execution.providers.market_action import market_action_provider
 from ...config import Settings
@@ -53,25 +54,40 @@ class AgentKitService:
         # Initialize AgentKit with basic action providers
         self.agent_kit = AgentKit(AgentKitConfig(
             wallet_provider=self.wallet_provider if self.wallet_provider else None,
-            action_providers=self._get_base_action_providers()
+            #action_providers=self._get_base_action_providers()
+            action_providers=[
+                
+                #cdp_wallet_action_provider(),
+                erc20_action_provider(),
+                pyth_action_provider(),
+                weth_action_provider(),
+                kuru_action_provider(),
+                wallet_action_provider(),
+                # market_action_provider(
+                #     allora_client=None,
+                #     market_analyzer=None,
+                #     market_data_service=None
+                # ),
+                #wallet_action_provider(),
+                morpho_action_provider(),
+                wow_action_provider(),
+                ##allora_action_provider(),
+            ]
         ))
 
-        self.llm = ChatDeepSeek(
-            model=config.DEEPSEEK_MODEL,
-            api_key=config.DEEPSEEK_API_KEY,
-            temperature=0,
-            max_tokens=None,
-            timeout=None,
-        )
-        
-        # # For LangChain integration
-        # self.llm = ChatOpenAI(
-        #     # model=config.OPENAI_MODEL or "gpt-4o-mini",
-        #     # api_key=config.OPENAI_API_KEY
-
+        # self.llm = ChatDeepSeek(
         #     model=config.DEEPSEEK_MODEL,
-        #     api_key=config.DEEPSEEK_API_KEY
+        #     api_key=config.DEEPSEEK_API_KEY,
+        #     temperature=0,
+        #     max_tokens=None,
+        #     timeout=None,
         # )
+        
+        # For LangChain integration
+        self.llm = ChatOpenAI(
+            model=config.OPENAI_MODEL or "gpt-4o-mini",
+            api_key=config.OPENAI_API_KEY
+        )
         self.tools = get_langchain_tools(self.agent_kit)
         
         # Store configuration
@@ -96,7 +112,11 @@ class AgentKitService:
     def _get_base_action_providers(self):
         """Get the base action providers without circular dependencies"""
         return [
-            cdp_api_action_provider(),
+            cdp_api_action_provider(
+                CdpWalletProviderConfig(
+
+                )
+            ),
             cdp_wallet_action_provider(),
             erc20_action_provider(),
             pyth_action_provider(),
@@ -107,7 +127,7 @@ class AgentKitService:
                 market_analyzer=None,
                 market_data_service=None
             ),
-            wallet_action_provider(),
+            #wallet_action_provider(),
             morpho_action_provider(),
             wow_action_provider(),
         ]

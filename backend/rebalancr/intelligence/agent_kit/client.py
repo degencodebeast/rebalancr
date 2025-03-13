@@ -38,6 +38,15 @@ class AgentKitClient:
     - WebSocket communication (handled by WebSocketMessageHandler)
     - Low-level infrastructure (handled by AgentKitService)
     """
+     
+    _instance = None  # Singleton pattern
+    @classmethod
+    def get_instance(cls, config=None, agent_manager=None):
+        """Get singleton instance of PrivyWalletProvider"""
+        if cls._instance is None:
+            cls._instance = cls(config, agent_manager=agent_manager)
+        return cls._instance
+    
     def __init__(self, config: Settings, intelligence_engine=None, agent_manager=None):
         """Initialize the client with references to required services."""
         # Import service here to avoid circular dependency 
