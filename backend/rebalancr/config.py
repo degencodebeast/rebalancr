@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # External APIs
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+    DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY")
     
     PRIVY_APP_ID: str = os.getenv("PRIVY_APP_ID")
     PRIVY_APP_SECRET: Optional[str] = os.getenv("PRIVY_APP_SECRET")
@@ -57,7 +63,7 @@ class Settings(BaseSettings):
 
     DATA_DIR: str = os.getenv("DATA_DIR", "./data")
 
-    NETWORK_ID: str = os.getenv("NETWORK_ID", "base-sepolia")
+    NETWORK_ID: str = os.getenv("NETWORK_ID", "monad-testnet")
     
     # Privy Server Wallets
     sqlite_db_path: str = "sqlite:///./data/rebalancr.db"

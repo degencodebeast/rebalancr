@@ -31,9 +31,16 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from .middleware.privy_auth import privy_auth_middleware
 
+import sys
+
+# Configure root logger to show detailed logs
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s',
+    stream=sys.stderr
+)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load configuration

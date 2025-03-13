@@ -91,9 +91,10 @@ def get_agent_kit_client():
     global _agent_kit_client
     if _agent_kit_client is None:
         config = get_settings()
-        agent_kit_service = get_agent_kit_service()
+        #agent_kit_service = get_agent_kit_service()
         intelligence_engine = get_intelligence_engine()
-        _agent_kit_client = AgentKitClient(config, intelligence_engine)
+        agent_manager = get_agent_manager()
+        _agent_kit_client = AgentKitClient(config, intelligence_engine, agent_manager)
     return _agent_kit_client
 
 # def get_action_registry():

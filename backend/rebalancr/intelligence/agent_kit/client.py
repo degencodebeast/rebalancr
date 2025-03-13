@@ -73,13 +73,15 @@ class AgentKitClient:
     async def initialize_session(self, user_id):
         """Initialize a new conversation and agent for a user"""
         # Create conversation
-        conversation = await self.agent_manager.db_manager.create_conversation(user_id)
-        self.conversations[user_id] = conversation.id
-        
+        #conversation = await self.agent_manager.db_manager.create_conversation(user_id)
+        #self.conversations[user_id] = conversation.id
+        conversation_id = "123"
         # Ensure wallet is initialized (through manager)
         await self.agent_manager.initialize_agent_for_user(user_id)
+        logger.info(f"Initialized session and agent for user {user_id}")
         
-        return conversation.id
+        #return conversation.id
+        return conversation_id
     
     async def get_agent_response(self, user_id, message, session_id=None):
         """
@@ -284,17 +286,6 @@ class AgentKitClient:
             conversation_id=conversation_id or "default"
         )
         
-        # Get market context if message seems related to trading/finance
-        market_context = None
-        if any(term in message.lower() for term in ["market", "price", "trade", "buy", "sell"]):
-            try:
-                # Optional: Add market data for relevant queries
-                market_context = await self._get_market_context()
-                # Enhance message with context
-                message = f"{message}\n\nCurrent market context: {json.dumps(market_context)}"
-            except Exception as e:
-                logger.warning(f"Failed to get market context: {e}")
-        
         # Track the last content value
         last_content = None
         
@@ -308,7 +299,7 @@ class AgentKitClient:
                 # Handle agent responses
                 if "agent" in chunk:
                     content = chunk["agent"]["messages"][0].content
-                    last_content = content  # Store the last content
+                    last_content = content  # Track the last content
                     yield chunk
                 # Handle other chunk types
                 else:
@@ -318,7 +309,7 @@ class AgentKitClient:
         if last_content:
             await self.agent_manager.store_message(
                 user_id=user_id,
-                message=last_content,  # Using the tracked last content
+                message=last_content,
                 message_type="agent",
                 conversation_id=conversation_id or "default"
             )

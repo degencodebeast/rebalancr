@@ -1,9 +1,12 @@
 from coinbase_agentkit import (
     AgentKit, AgentKitConfig, CdpWalletProvider, CdpWalletProviderConfig,
     cdp_api_action_provider, cdp_wallet_action_provider, 
-    erc20_action_provider, pyth_action_provider, weth_action_provider
+    erc20_action_provider, morpho_action_provider, pyth_action_provider, wallet_action_provider, weth_action_provider, wow_action_provider
 )
-from langchain_openai import ChatOpenAI
+#from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_deepseek import ChatDeepSeek
+
 from coinbase_agentkit_langchain import get_langchain_tools
 from rebalancr.execution.providers.kuru import kuru_action_provider
 from rebalancr.execution.providers.market_action import market_action_provider
@@ -52,12 +55,23 @@ class AgentKitService:
             wallet_provider=self.wallet_provider if self.wallet_provider else None,
             action_providers=self._get_base_action_providers()
         ))
-        
-        # For LangChain integration
-        self.llm = ChatOpenAI(
-            model=config.OPENAI_MODEL or "gpt-4o-mini",
-            api_key=config.OPENAI_API_KEY
+
+        self.llm = ChatDeepSeek(
+            model=config.DEEPSEEK_MODEL,
+            api_key=config.DEEPSEEK_API_KEY,
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
         )
+        
+        # # For LangChain integration
+        # self.llm = ChatOpenAI(
+        #     # model=config.OPENAI_MODEL or "gpt-4o-mini",
+        #     # api_key=config.OPENAI_API_KEY
+
+        #     model=config.DEEPSEEK_MODEL,
+        #     api_key=config.DEEPSEEK_API_KEY
+        # )
         self.tools = get_langchain_tools(self.agent_kit)
         
         # Store configuration
@@ -92,7 +106,10 @@ class AgentKitService:
                 allora_client=None,
                 market_analyzer=None,
                 market_data_service=None
-            )
+            ),
+            wallet_action_provider(),
+            morpho_action_provider(),
+            wow_action_provider(),
         ]
         
     def register_portfolio_provider(self, portfolio_provider):

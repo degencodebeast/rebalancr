@@ -90,13 +90,13 @@ class PrivyWalletProvider(EvmWalletProvider):
         
         # Get chain ID from network ID
         #chain_id = self._get_chain_id_from_network_id(config.network_id)
-        chain_id =  "base_sepolia"
+        chain_id =  "monad-testnet"
         # Setup Web3 connection with RPC URL
         #rpc_url = self._get_rpc_url_for_network(config.network_id)
-        rpc_url = "https://sepolia.base.org"
+        #rpc_url = "https://sepolia.base.org"
 
         #chain_id = "monad_testnet"
-        #rpc_url = "https://testnet-rpc.monad.xyz"
+        rpc_url = "https://testnet-rpc.monad.xyz"
         self._web3 = Web3(Web3.HTTPProvider(rpc_url))
         
         # Initialize network object (matches CDP wallet provider)
@@ -134,18 +134,32 @@ class PrivyWalletProvider(EvmWalletProvider):
         logger.info(f"Initialized PrivyWalletProvider with app_id: {config.app_id}, network: {config.network_id}")
     
     def _get_chain_id_from_network_id(self, network_id: str) -> int:
-        """Convert network ID to chain ID"""
+        """Convert network ID to chain ID.
+        
+        Args:
+            network_id: String identifier for the network (e.g. 'ethereum', 'base-sepolia')
+            
+        Returns:
+            int: The corresponding chain ID for the network
+        """
         network_map = {
             "ethereum": 1,
-            "goerli": 5,
+            "goerli": 5, 
             "sepolia": 11155111,
             "base": 8453,
             "base-sepolia": 84532,
             "optimism": 10,
             "arbitrum": 42161,
-            "polygon": 137
+            "polygon": 137,
+            "monad-testnet": 10143
         }
-        return network_map.get(network_id, 1)  # Default to Ethereum mainnet
+        
+        chain_id = network_map.get(network_id)
+        if chain_id is None:
+            logger.warning(f"Unknown network ID: {network_id}, defaulting to Ethereum mainnet (1)")
+            chain_id = 1
+            
+        return chain_id
     
     def _get_rpc_url_for_network(self, network_id: str) -> str:
         """Get RPC URL for the specified network"""

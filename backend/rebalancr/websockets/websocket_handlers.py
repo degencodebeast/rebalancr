@@ -1,7 +1,9 @@
+import contextlib
 import logging
 import json
 from typing import Dict, Any, Optional
 
+from coinbase_agentkit_langchain import get_langchain_tools
 from fastapi import WebSocket, WebSocketDisconnect
 from langchain_core.messages import HumanMessage
 
@@ -10,6 +12,11 @@ from ..config import Settings, get_settings
 from ..websockets.websocket_manager import websocket_manager
 from ..api.dependencies import get_agent_manager, get_agent_kit_client
 from .auth import authenticate_websocket
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
+from coinbase_agentkit import AgentKit, AgentKitConfig
+from langgraph.prebuilt import create_react_agent
+
 
 logger = logging.getLogger(__name__)
 
@@ -110,11 +117,115 @@ async def handle_websocket(websocket: WebSocket):
         }, user_id)
         await websocket_manager.disconnect(websocket, user_id)
 
+# async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str, Any]):
+#     """Handle chat messages with streaming response"""
+#     try:
+#         message = data.get("message", "")
+#         conversation_id = data.get("conversation_id")
+
+#         logger.info(f"Received message: {message}")
+#         logger.info(f"Conversation ID: {conversation_id}")
+        
+#         if not message:
+#             await websocket_manager.send_personal_message({
+#                 "type": "error",
+#                 "content": "Message cannot be empty"
+#             }, user_id)
+#             return
+        
+#         # Show typing indicator
+#         await websocket_manager.send_personal_message({
+#             "type": "typing",
+#             "content": "Processing your request..."
+#         }, user_id)
+        
+#         # Get client (business logic layer)
+#         agent_kit_client = get_agent_kit_client()
+
+#         agent_manager = agent_kit_client.agent_manager
+
+#          # Store user message
+#         if hasattr(agent_manager, "history_manager"):
+#             await agent_manager.store_message(
+#                 user_id=user_id,
+#                 message=message,
+#                 message_type="user",
+#                 conversation_id=conversation_id or "default"
+#             )
+        
+          
+#         # Process with agent via streaming for better UX
+#         async with agent_manager.get_agent_executor(user_id, conversation_id) as agent_executor:
+#             # Stream responses from the agent
+#             async for chunk in agent_executor.astream(
+#                 input={"messages": [HumanMessage(content=message)]},
+#                 config={"configurable": {"thread_id": f"{user_id}-{conversation_id}"}}
+#             ):
+#                 # Handle agent responses
+#                 if "agent" in chunk:
+#                     content = chunk["agent"]["messages"][0].content
+#                     await websocket_manager.send_personal_message({
+#                         "type": "chat",
+#                         "content": content,
+#                         "conversation_id": conversation_id
+#                     }, user_id)
+                
+#                 # Handle tool executions (useful for UI feedback)
+#                 elif "tools" in chunk:
+#                     tool_content = chunk["tools"]["messages"][0].content
+#                     await websocket_manager.send_personal_message({
+#                         "type": "tool",
+#                         "content": tool_content,
+#                         "conversation_id": conversation_id
+#                     }, user_id)
+        
+#           # After streaming is complete, if there was a complete response, store it
+#         if hasattr(agent_manager, "history_manager") and "content" in locals():
+#             await agent_manager.store_message(
+#                 user_id=user_id,
+#                 message=content,  # Using the last content chunk
+#                 message_type="agent",
+#                 conversation_id=conversation_id or "default"
+#             )
+#         # logger.info(f"Agent kit client initialized: {agent_kit_client}")
+#         # # Ensure conversation exists or create one
+#         # if not conversation_id:
+#         #     conversation_id = await agent_kit_client.initialize_session(user_id)
+            
+#         # # Stream responses with business logic enrichment
+#         # async for chunk in agent_kit_client.stream_agent_response(user_id, message, conversation_id):
+#         #     # Handle agent responses
+#         #     if "agent" in chunk:
+#         #         content = chunk["agent"]["messages"][0].content
+#         #         await websocket_manager.send_personal_message({
+#         #             "type": "chat", 
+#         #             "content": content,
+#         #             "conversation_id": conversation_id
+#         #         }, user_id)
+            
+#         #     # Handle tool executions (useful for UI feedback)
+#         #     elif "tools" in chunk:
+#         #         tool_content = chunk["tools"]["messages"][0].content
+#         #         await websocket_manager.send_personal_message({
+#         #             "type": "tool",
+#         #             "content": tool_content, 
+#         #             "conversation_id": conversation_id
+#         #         }, user_id)
+                
+#     except Exception as e:
+#         logger.error(f"Error handling chat message: {str(e)}")
+#         await websocket_manager.send_personal_message({
+#             "type": "error",
+#             "content": f"Error processing your message: {str(e)}",
+#             "conversation_id": data.get("conversation_id")
+#         }, user_id)
+
+
 async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str, Any]):
-    """Handle chat messages with streaming response"""
+    """Emergency simplified chat handler for hackathon demo"""
     try:
         message = data.get("message", "")
-        conversation_id = data.get("conversation_id")
+        conversation_id = data.get("conversation_id", "default")
         
         if not message:
             await websocket_manager.send_personal_message({
@@ -129,32 +240,82 @@ async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str
             "content": "Processing your request..."
         }, user_id)
         
-        # Get client (business logic layer)
-        agent_kit_client = get_agent_kit_client()
+        # Get agent manager directly
+        agent_manager = get_agent_manager()
         
-        # Ensure conversation exists or create one
-        if not conversation_id:
-            conversation_id = await agent_kit_client.initialize_session(user_id)
+        # Initialize agent for user (ensures wallet is ready)
+        await agent_manager.initialize_agent_for_user(user_id)
+        
+        # Create a simple context manager that doesn't use AsyncSqliteSaver
+        @contextlib.asynccontextmanager
+        async def get_simple_executor():
+            # Get tools using helper function
+            agentkit = agent_manager.service.get_agent_kit()
+            tools = get_langchain_tools(agentkit)
             
-        # Stream responses with business logic enrichment
-        async for chunk in agent_kit_client.stream_agent_response(user_id, message, conversation_id):
-            # Handle agent responses
-            if "agent" in chunk:
-                content = chunk["agent"]["messages"][0].content
+            # Create a memory-based checkpointer instead of SQLite
+            memory_saver = MemorySaver()
+            
+            # Create a simple thread ID
+            thread_id = f"{user_id}-{conversation_id}"
+            config = {"configurable": {"thread_id": thread_id}}
+            
+            # Create the agent directly with minimal components
+            agent = create_react_agent(
+                model=agent_manager.service.llm,
+                tools=tools,
+                checkpointer=memory_saver,
+                state_modifier=(
+                    "You are a financial assistant that helps users manage their portfolios and find "
+                    "the best investment opportunities. You can perform on-chain transactions when requested. "
+                    "Be concise in your responses. Use tools when appropriate. If there's an error, "
+                    "just explain it simply without trying complex solutions."
+                ),
+            )
+            yield agent
+            
+        # Use our simplified executor
+        async with get_simple_executor() as agent_executor:
+            # Store user message (without using history manager)
+            print(f"Processing message from {user_id}: {message}")
+            
+            # Process with direct streaming
+            content_parts = []
+            
+            try:
+                async for chunk in agent_executor.astream(
+                    input={"messages": [HumanMessage(content=message)]},
+                    config={"configurable": {"thread_id": f"{user_id}-{conversation_id}"}}
+                ):
+                    # Handle agent responses
+                    if "agent" in chunk:
+                        content = chunk["agent"]["messages"][0].content
+                        content_parts.append(content)
+                        
+                        await websocket_manager.send_personal_message({
+                            "type": "chat",
+                            "content": content,
+                            "conversation_id": conversation_id
+                        }, user_id)
+                    
+                    # Handle tool executions
+                    elif "tools" in chunk:
+                        tool_content = chunk["tools"]["messages"][0].content
+                        await websocket_manager.send_personal_message({
+                            "type": "tool",
+                            "content": tool_content,
+                            "conversation_id": conversation_id
+                        }, user_id)
+            except Exception as e:
+                # If streaming fails, send a simple response
+                logger.error(f"Error in streaming: {str(e)}")
                 await websocket_manager.send_personal_message({
-                    "type": "chat", 
-                    "content": content,
+                    "type": "chat",
+                    "content": f"I encountered an error while processing your request. Please try again with a simpler question.",
                     "conversation_id": conversation_id
                 }, user_id)
-            
-            # Handle tool executions (useful for UI feedback)
-            elif "tools" in chunk:
-                tool_content = chunk["tools"]["messages"][0].content
-                await websocket_manager.send_personal_message({
-                    "type": "tool",
-                    "content": tool_content, 
-                    "conversation_id": conversation_id
-                }, user_id)
+                
+            # Don't attempt to store the response - skip this step for hackathon
                 
     except Exception as e:
         logger.error(f"Error handling chat message: {str(e)}")
@@ -163,6 +324,60 @@ async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str
             "content": f"Error processing your message: {str(e)}",
             "conversation_id": data.get("conversation_id")
         }, user_id)
+
+
+
+# async def handle_chat_message(websocket: WebSocket, user_id: str, data: Dict[str, Any]):
+#     """Handle chat messages with direct response (non-streaming)"""
+#     try:
+#         message = data.get("message", "")
+#         conversation_id = data.get("conversation_id")
+        
+#         if not message:
+#             await websocket_manager.send_personal_message({
+#                 "type": "error",
+#                 "content": "Message cannot be empty"
+#             }, user_id)
+#             return
+        
+#         # Show typing indicator
+#         await websocket_manager.send_personal_message({
+#             "type": "typing",
+#             "content": "Processing your request..."
+#         }, user_id)
+        
+#         # Get the AgentManager directly
+#         agent_manager = get_agent_manager()
+        
+#         # Store user message
+#         await agent_manager.store_message(
+#             user_id=user_id,
+#             message=message,
+#             message_type="user",
+#             conversation_id=conversation_id or "default"
+#         )
+        
+#         # Use direct response method instead of streaming
+#         response = await agent_manager.get_agent_response(
+#             user_id=user_id,
+#             message=message,
+#             session_id=conversation_id
+#         )
+        
+#         # Send the complete response
+#         await websocket_manager.send_personal_message({
+#             "type": "chat",
+#             "content": response,
+#             "conversation_id": conversation_id
+#         }, user_id)
+                
+#     except Exception as e:
+#         logger.error(f"Error handling chat message: {str(e)}")
+#         await websocket_manager.send_personal_message({
+#             "type": "error",
+#             "content": f"Error processing your message: {str(e)}",
+#             "conversation_id": data.get("conversation_id")
+#         }, user_id)
 
 async def handle_wallet_info(websocket: WebSocket, user_id: str, data: Dict[str, Any]):
     """
