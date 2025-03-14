@@ -1,0 +1,112 @@
+.sidenav_wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .navlinks {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #f1f1f1;
+    padding-left: 12px;
+  }
+
+  .navlinks_active {
+    color: #fff;
+    background-color: #8c52ff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .logo-container {
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    h1 {
+      color: #f0f0f0;
+      font-size: 32px;
+      font-weight: 500;
+    }
+  }
+}
+
+.mantine-AppShell-main {
+  background-color: #f8f9ff;
+}
+
+.mantine-AppShell-navbar {
+  background-color: #ffffff;
+  padding-left: 24px;
+  padding-right: 48px;
+  border-right: 1px solid #f1f1f1;
+}
+
+.mantine-AppShell-header {
+  background-color: #ffffff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.mantine-NavLink-root {
+  color: #3e4959;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  padding: 16px;
+  gap: 16px;
+
+  &:hover {
+    background-color: #f3f0ff;
+  }
+
+  .mantine-NavLink-section {
+    margin-right: 0;
+  }
+
+  &[data-active='true'] {
+    background-color: #8c52ff;
+    color: white !important;
+
+    .mantine-NavLink-label {
+      font-weight: 500;
+      color: white;
+    }
+
+    .mantine-NavLink-section {
+      color: white;
+    }
+
+    .mantine-NavLink-section svg {
+      color: white;
+    }
+  }
+
+  .mantine-NavLink-label {
+    color: #3e4959;
+    font-size: 20px;
+  }
+
+  .mantine-NavLink-section {
+    color: #3e4959;
+  }
+}
+
+// .mantine-NavLink-label {
+//   color: #000000b3 !important;
+// }
+
+.mantine-NavLink-section svg {
+  width: 25px !important;
+  height: 25px !important;
+}
+
+@media screen and (max-width: 800px) {
+  .sidenav_img {
+    display: none;
+  }
+}

@@ -1,0 +1,240 @@
+// Chat input styling
+.chat-input {
+  .mantine-Textarea-wrapper {
+    .mantine-Textarea-input {
+      background-color: #f0f0f0;
+      border: 1px solid #949494 !important;
+      border-radius: 8px;
+      padding: 16px;
+      padding-right: 100px;
+      color: #1b1919;
+      border: none;
+      font-size: 16px;
+      max-height: 250px;
+      overflow-y: auto;
+
+      &::placeholder {
+        color: hsla(0, 4%, 10%, 0.5);
+      }
+
+      &:focus,
+      &:hover {
+        border: 1px solid #8c52ff !important;
+      }
+    }
+  }
+
+  .mantine-Textarea-section {
+    right: 4%;
+    align-self: flex-end;
+    margin-bottom: 8px;
+    position: absolute;
+    z-index: 2;
+
+    button {
+      border-radius: 8px;
+      margin-right: 4px;
+      min-height: 40px;
+      min-width: 80px;
+      background-color: #8c52ff;
+      font-size: 16px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  }
+}
+
+.mantine-Textarea-input {
+  &.chat-input {
+    color: white;
+  }
+}
+
+// Chat styling for WhatsApp-like layout
+.chat-container {
+  .message-row {
+    display: flex;
+    margin-bottom: 16px;
+    align-items: flex-end;
+    width: 100%;
+
+    &.user-message {
+      flex-direction: row-reverse;
+    }
+  }
+
+  .avatar-container {
+    flex-shrink: 0;
+    margin: 0 8px;
+  }
+
+  .message-bubble {
+    max-width: 70%;
+    border-radius: 12px;
+    position: relative;
+    border: none;
+    color: white;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    width: fit-content;
+    min-width: 60px;
+    //max-width: 600px;
+
+    &.assistant-bubble {
+      background-color: #8c52ff14;
+      border-bottom-left-radius: 0;
+    }
+
+    &.user-bubble {
+      background-color: #8c52ff;
+      border-bottom-right-radius: 0;
+    }
+
+    p {
+      margin: 0;
+      padding: 12px 16px;
+      overflow-wrap: break-word;
+      word-break: break-all;
+    }
+  }
+
+  .chat-input {
+    .mantine-Textarea-wrapper {
+      .mantine-Textarea-input {
+        background-color: #121212;
+        border-radius: 40px;
+        padding: 8px 16px;
+        color: white;
+        border: none;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        &:focus {
+          border-color: #8c52ff;
+        }
+      }
+    }
+
+    .mantine-Textarea-section {
+      right: 4px;
+    }
+  }
+}
+
+@media screen and (max-width: 1200px) {
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 7%;
+    }
+  }
+}
+
+@media screen and (max-width: 800px) {
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 6%;
+    }
+  }
+}
+
+// @media screen and (max-width: 500px) {
+//   .chat-container {
+//     .message-bubble {
+//       max-width: 80%;
+//     }
+//   }
+
+//   .chat-input {
+//     .mantine-Textarea-section {
+//       right: 11%;
+//     }
+//   }
+// }
+
+@media screen and (max-width: 500px) {
+  .chat-container {
+    .message-bubble {
+      max-width: 85%;
+    }
+  }
+
+  .chat-input {
+    .mantine-Textarea-section {
+      right: 12%;
+    }
+  }
+}
+
+// Add back markdown styling
+.prose {
+  color: #121212;
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  ul,
+  ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  li {
+    margin-bottom: 0.25rem;
+  }
+
+  p {
+    margin-bottom: 0.75rem;
+  }
+
+  // Table styles
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+
+  th,
+  td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+// Make tables responsive in chat bubbles
+.assistant-bubble .prose {
+  table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}
