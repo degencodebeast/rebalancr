@@ -19,7 +19,10 @@ from .schemas import (
     OrderStatusParams, 
     BatchOrderParams, 
     MarginActionParams, 
-    OrderbookParams
+    OrderbookParams,
+    SUPPORTED_MARKETS_LITERAL,
+    SUPPORTED_TOKENS_LITERAL,
+    SUPPORTED_NETWORKS_LITERAL,
 )
 from .constants import (
     TOKEN_ADDRESSES, 
@@ -31,7 +34,8 @@ from .constants import (
     NETWORK_ID_TO_CHAIN_ID,
     SUPPORTED_NETWORKS,
     NATIVE_TOKEN_ADDRESS,
-    KURU_CONTRACT_ADDRESSES
+    KURU_CONTRACT_ADDRESSES,
+    DEPOSITABLE_TOKENS,
 )
 from .utils import approve_token, format_amount_from_decimals, format_amount_with_decimals
 
@@ -72,14 +76,23 @@ class KuruActionProvider(ActionProvider[EvmWalletProvider]):
             
         rpc_url = self.rpc_url_by_chain_id.get(chain_id)
         if not rpc_url:
+            logger.error(f"No RPC URL configured for chain ID {chain_id}")
             return False
             
         try:
             # Create Web3 instance
             self.web3_providers[chain_id] = Web3(Web3.HTTPProvider(rpc_url))
+            # Test connection
+            if not self.web3_providers[chain_id].is_connected():
+                logger.error(f"Failed to connect to RPC endpoint {rpc_url}")
+                del self.web3_providers[chain_id]
+                return False
+            logger.info(f"Successfully connected to RPC for chain ID {chain_id}")
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize Web3 provider: {str(e)}")
+            logger.error(f"Failed to initialize Web3 provider for chain {chain_id}: {str(e)}")
+            if chain_id in self.web3_providers:
+                del self.web3_providers[chain_id]
             return False
     
     def _get_margin_account(self, chain_id: int) -> str:
@@ -201,62 +214,90 @@ Important notes:
             return f"Failed to execute swap: {str(e)}"
     
     def _create_order(self, 
-                          wallet_provider: EvmWalletProvider, 
-                          chain_id: int,
-                          market_address: str, 
-                          order_type: str, 
-                          side: str, 
-                          size: str, 
-                          price: Optional[str] = None,
-                          min_amount_out: Optional[str] = None,
-                          post_only: bool = False,
-                          cloid: Optional[str] = None) -> str:
+                  wallet_provider: EvmWalletProvider, 
+                  chain_id: int,
+                  market_address: str, 
+                  order_type: str, 
+                  side: str, 
+                  size: str, 
+                  price: Optional[str] = None,
+                  min_amount_out: Optional[str] = None,
+                  post_only: bool = False,
+                  cloid: Optional[str] = None) -> str:
         """Create an order using direct contract interaction"""
         # Get market contract
         market_contract = self._get_contract(chain_id, market_address, KURU_MARKET_ABI)
         
-        # Determine order type
-        order_type_value = 0  # 0 for limit
-        if order_type.lower() == "market":
-            order_type_value = 1
-        
-        # Determine side
-        side_value = 0  # 0 for buy
-        if side.lower() == "sell":
-            side_value = 1
-        
         # Convert size and price to contract format
         size_value = Web3.to_wei(float(size), 'ether')
-        price_value = Web3.to_wei(float(price) if price else 0, 'ether')
         
-        # Optional parameters
-        min_out = Web3.to_wei(float(min_amount_out) if min_amount_out else 0, 'ether')
-        client_order_id = cloid or f"order_{market_address}_{side}_{size}"
-        
-        # Encode the createOrder function call
-        # The exact parameters depend on the actual contract implementation
-        create_order_data = market_contract.encodeABI(
-            fn_name="createOrder", 
-            args=[
-                side_value,                # side (0=buy, 1=sell)
-                price_value,               # price
-                size_value,                # size
-                order_type_value,          # orderType
-                int(post_only),            # postOnly (0=false, 1=true)
-                min_out,                   # minAmountOut
-                client_order_id            # client order id
-            ]
-        )
+        # Handle limit orders differently from market orders
+        if order_type.lower() == "limit":
+            # For limit orders, use addBuyOrder or addSellOrder
+            price_value = Web3.to_wei(float(price) if price else 0, 'ether')
+            
+            if side.lower() == "buy":
+                # Encode the addBuyOrder function call
+                order_data = market_contract.encode_abi(
+                    "addBuyOrder",
+                    args=[
+                        price_value,       # price
+                        size_value,        # size
+                        post_only          # postOnly (boolean)
+                    ]
+                )
+            else:  # sell
+                # Encode the addSellOrder function call
+                order_data = market_contract.encode_abi(
+                    "addSellOrder",
+                    args=[
+                        price_value,       # price
+                        size_value,        # size
+                        post_only          # postOnly (boolean)
+                    ]
+                )
+            
+            logger.info(f"Creating limit {side} order: price={price}, size={size}, post_only={post_only}")
+        else:  # market orders
+            # For market orders, use placeAndExecuteMarketBuy or placeAndExecuteMarketSell
+            min_out = Web3.to_wei(float(min_amount_out) if min_amount_out else 0, 'ether')
+            
+            if side.lower() == "buy":
+                # Encode the placeAndExecuteMarketBuy function call
+                order_data = market_contract.encode_abi(
+                    "placeAndExecuteMarketBuy",
+                    args=[
+                        size_value,        # quoteSize (amount to spend)
+                        min_out,           # minAmountOut
+                        False,             # isMargin
+                        True               # fillOrKill
+                    ]
+                )
+            else:  # sell
+                # Encode the placeAndExecuteMarketSell function call
+                order_data = market_contract.encode_abi(
+                    "placeAndExecuteMarketSell",
+                    args=[
+                        size_value,        # size (amount to sell)
+                        min_out,           # minAmountOut
+                        False,             # isMargin
+                        True               # fillOrKill
+                    ]
+                )
+            
+            logger.info(f"Creating market {side} order: size={size}, min_out={min_amount_out}")
         
         # Prepare transaction
         tx_params = {
             "to": market_address,
-            "data": create_order_data,
-            "value": 0  # No ETH value sent with tx
+            "data": order_data,
+            "value": 0,  # No ETH value sent with tx
+            "gas": 500000  # Higher gas limit for safety
         }
         
         # Send transaction using wallet provider
         tx_hash = wallet_provider.send_transaction(tx_params)
+        logger.info(f"Order transaction sent: {tx_hash}")
         
         # Return transaction hash
         return tx_hash
@@ -271,8 +312,8 @@ Important notes:
         market_contract = self._get_contract(chain_id, market_address, KURU_MARKET_ABI)
         
         # Encode the cancelOrder function call
-        cancel_order_data = market_contract.encodeABI(
-            fn_name="cancelOrder", 
+        cancel_order_data = market_contract.encode_abi(
+            "cancelOrder",  # Function name as positional argument (not fn_name=)
             args=[order_id]
         )
         
@@ -341,8 +382,8 @@ Important notes:
             order_cloids.append(cloid)
         
         # Encode the batchOrders function call
-        batch_orders_data = market_contract.encodeABI(
-            fn_name="batchOrders", 
+        batch_orders_data = market_contract.encode_abi(
+            "batchOrders",  # Function name as positional argument (not fn_name=)
             args=[
                 order_sides,
                 order_prices,
@@ -368,46 +409,108 @@ Important notes:
         return tx_hash
 
     def _deposit_to_margin(self,
-                              wallet_provider: EvmWalletProvider,
-                              chain_id: int,
-                              token_address: str,
-                              amount: Union[int, str]) -> str:
-        """Deposit tokens to margin account using direct contract interaction"""
+                          wallet_provider: EvmWalletProvider,
+                          chain_id: int,
+                          token_address: str,
+                          amount: Union[int, str]) -> str:
+        """Deposit tokens to margin account using direct contract interaction
+        
+        Based on the Kuru TypeScript SDK (https://github.com/Kuru-Labs/kuru-sdk)
+        """
         # Get margin account address
         margin_account = self._get_margin_account(chain_id)
+        if not margin_account:
+            raise ValueError(f"No margin account address configured for chain {chain_id}")
         
-        # Convert amount to Wei if it's not already
+        # Convert amount to wei if it's a string
         amount_wei = Web3.to_wei(float(amount), 'ether') if isinstance(amount, str) else amount
         
-        # # First approve token transfer
-        # approve_token(
-        #     wallet_provider=wallet_provider,
-        #     token_address=token_address,
-        #     spender_address=margin_account,
-        #     amount=amount_wei
-        # )
+        # Get user address
+        user_address = wallet_provider.get_address()
         
-        # Get margin contract
-        margin_contract = self._get_contract(chain_id, margin_account, KURU_MARGIN_ABI)
-        
-        # Encode the deposit function call
-        deposit_data = margin_contract.encodeABI(
-            fn_name="deposit", 
-            args=[token_address, amount_wei]
-        )
-        
-        # Prepare transaction
-        tx_params = {
-            "to": margin_account,
-            "data": deposit_data,
-            "value": 0
-        }
-        
-        # Send transaction using wallet provider
-        tx_hash = wallet_provider.send_transaction(tx_params)
-        
-        # Return transaction hash
-        return tx_hash
+        try:
+            # Get margin contract
+            margin_contract = self._get_contract(chain_id, margin_account, KURU_MARGIN_ABI)
+            
+            # Encode the deposit function call with the appropriate parameters
+            # According to the ABI, deposit takes (address _user, address _token, uint256 _amount)
+            deposit_data = margin_contract.encode_abi(
+                "deposit",  # Function name as positional argument (not fn_name=)
+                args=[
+                    user_address,               # User address (_user)
+                    token_address,              # Token address (_token)
+                    amount_wei                  # Amount in wei (_amount)
+                ]
+            )
+            
+            # Log transaction details for debugging
+            logger.info(f"Preparing deposit transaction: to={margin_account}, user={user_address}, token={token_address}, amount={amount_wei}")
+            
+            # Check if this is native token (ETH/MON)
+            if token_address == NATIVE_TOKEN_ADDRESS:
+                # For native token, we need to send value with the transaction
+                
+                # Verify user has enough balance
+                native_balance = wallet_provider.get_balance()
+                if native_balance < amount_wei:
+                    raise ValueError(
+                        f"Insufficient native token balance. Requested: {format_amount_with_decimals(amount_wei, 18)} MON, "
+                        f"Available: {format_amount_with_decimals(native_balance, 18)} MON"
+                    )
+                
+                tx_params = {
+                    "to": margin_account,
+                    "data": deposit_data,
+                    "value": amount_wei,     # Send ETH/MON with transaction
+                    "gas": 500000,           # Higher gas limit for safety
+                    "gasPrice": None         # Let wallet provider determine gas price
+                }
+                logger.info("Sending native token deposit with value field")
+            else:
+                # For ERC20 tokens - Perform approval first if needed
+                try:
+                    # Approve margin account to spend tokens
+                    approval_receipt = approve_token(
+                        wallet_provider=wallet_provider,
+                        token_address=token_address,
+                        spender_address=margin_account,
+                        amount=amount_wei
+                    )
+                    
+                    # Log approval details
+                    if approval_receipt:
+                        tx_hash = approval_receipt.get("transactionHash", "unknown")
+                        logger.info(f"Token approval completed with hash: {tx_hash}")
+                    else:
+                        logger.info("No approval needed (possibly for native token)")
+                    
+                    # Check if receipt status is successful
+                    if approval_receipt and approval_receipt.get("status") != 1:
+                        tx_hash = approval_receipt.get("transactionHash", "unknown")
+                        raise Exception(f"Token approval failed: {tx_hash}")
+                    
+                    logger.info("Token approval confirmed, proceeding with deposit")
+                except Exception as e:
+                    logger.error(f"Error during token approval: {str(e)}")
+                    raise
+                
+                # Now prepare the deposit transaction
+                tx_params = {
+                    "to": margin_account,
+                    "data": deposit_data,
+                    "value": 0,              # No ETH value for ERC20 deposits
+                    "gas": 400000            # Gas limit for ERC20 deposit
+                }
+                logger.info("Sending ERC20 token deposit")
+            
+            # Send transaction using wallet provider
+            tx_hash = wallet_provider.send_transaction(tx_params)
+            logger.info(f"Deposit transaction sent: {tx_hash}")
+            
+            return tx_hash
+        except Exception as e:
+            logger.error(f"Error in _deposit_to_margin: {str(e)}")
+            raise
     
     def _get_margin_balance(self,
                               wallet_provider: EvmWalletProvider,
@@ -662,64 +765,103 @@ Important notes:
     @create_action(
         name="deposit-margin",
         description="""
-This tool allows depositing assets to a Kuru margin account.
+This tool allows depositing MON to your Kuru margin account on Monad testnet.
 It takes:
-- token_id: The token to deposit (on Monad testnet, only 'native' (MON) is supported)
-- amount: The amount to deposit in decimal units
+- amount: The amount of MON to deposit in decimal units
 - network_id: (Optional) Network ID (default: monad-testnet)
 
 Example:
-- Deposit 10 MON: token_id=native, amount=10
+- Deposit 10 MON: amount=10
 
 Important notes:
-- On Monad testnet, only native MON can be deposited
-- Depositing increases your margin account balance for trading
-- You must approve the token for transfer first (this happens automatically)
+- Only native MON can be deposited on Monad testnet
+- No other tokens are supported for deposits
 """,
         schema=MarginActionParams
     )
     def deposit_margin(self, wallet_provider: EvmWalletProvider, args: Dict[str, Any]) -> str:
         """Deposit assets to a Kuru margin account"""
-        params = MarginActionParams(**args)
-        network_id = params.network_id
-        
-        # Get chain id
-        chain_id = NETWORK_ID_TO_CHAIN_ID.get(network_id)
-        if not chain_id:
-            return f"Unsupported network: {network_id}"
-        
-        # Initialize Web3
-        if not self._initialize_web3(chain_id):
-            return f"Failed to initialize Web3 for network {network_id}"
-        
         try:
-            # Validate token is supported for this network
-            if network_id == "monad-testnet" and params.token_id != "native":
-                return "Error: On Monad testnet, only native MON can be deposited"
+            params = MarginActionParams(**args)
+            network_id = params.network_id
+            token_id = params.token_id
+            
+            # Check if token is depositable for the network (schema validation should handle this,
+            # but we double-check here for extra safety)
+            if network_id in DEPOSITABLE_TOKENS and token_id not in DEPOSITABLE_TOKENS[network_id]:
+                return f"Error: Token {token_id} cannot be deposited on {network_id}. Supported tokens: {', '.join(DEPOSITABLE_TOKENS[network_id])}"
+        
+            # Get chain id
+            chain_id = NETWORK_ID_TO_CHAIN_ID.get(network_id)
+            if not chain_id:
+                return f"Unsupported network: {network_id}"
+            
+            logger.info(f"Attempting deposit on chain {chain_id} ({network_id}) for token {token_id}")
+            
+            # Initialize Web3
+            if not self._initialize_web3(chain_id):
+                return f"Failed to initialize Web3 for network {network_id}. Please check RPC configuration."
             
             # Get token address
-            token_address = self._get_token_address(network_id, params.token_id)
+            token_address = self._get_token_address(network_id, token_id)
+            logger.info(f"Using token address: {token_address} for {token_id}")
             
-            # Deposit to margin account
-            tx_hash = self._deposit_to_margin(
-                wallet_provider=wallet_provider,
-                chain_id=chain_id,
-                token_address=token_address,
-                amount=params.amount
-            )
-            
-            # Wait for receipt
-            receipt = wallet_provider.wait_for_transaction_receipt(tx_hash)
-            
-            # Check status
-            if receipt['status'] == 1:
-                token_name = "MON" if params.token_id == "native" and network_id == "monad-testnet" else params.token_id.upper()
-                return f"Successfully deposited {params.amount} {token_name} to margin account. Transaction hash: {tx_hash}"
+            # Convert amount to Wei for native tokens, or use token decimals for ERC20
+            if token_address == NATIVE_TOKEN_ADDRESS:
+                amount_wei = Web3.to_wei(float(params.amount), 'ether')
+                # Check user's native token balance
+                user_address = wallet_provider.get_address()
+                native_balance = wallet_provider.get_balance()
+                
+                if native_balance < amount_wei:
+                    formatted_balance = format_amount_with_decimals(native_balance, 18)
+                    return f"Insufficient {token_id.upper()} balance. You have {formatted_balance}, but trying to deposit {params.amount}"
             else:
-                return f"Margin deposit transaction failed. Transaction hash: {tx_hash}"
+                # For ERC20 tokens, get decimals and convert amount
+                token_contract = self._get_contract(chain_id, token_address, ERC20_ABI)
+                try:
+                    decimals = token_contract.functions.decimals().call()
+                    amount_wei = int(float(params.amount) * (10 ** decimals))
+                    
+                    # Check user's token balance
+                    user_address = wallet_provider.get_address()
+                    token_balance = token_contract.functions.balanceOf(user_address).call()
+                    
+                    if token_balance < amount_wei:
+                        formatted_balance = format_amount_with_decimals(token_balance, decimals)
+                        return f"Insufficient {token_id.upper()} balance. You have {formatted_balance}, but trying to deposit {params.amount}"
+                except Exception as e:
+                    logger.error(f"Error getting token details: {str(e)}")
+                    return f"Failed to get details for token {token_id}: {str(e)}"
+            
+            # Send the transaction
+            try:
+                logger.info(f"Sending deposit transaction for {params.amount} {token_id}")
+                tx_hash = self._deposit_to_margin(
+                    wallet_provider=wallet_provider,
+                    chain_id=chain_id,
+                    token_address=token_address,
+                    amount=params.amount
+                )
+                
+                logger.info(f"Deposit transaction sent: {tx_hash}")
+                
+                # Wait for receipt with timeout
+                receipt = wallet_provider.wait_for_transaction_receipt(tx_hash, timeout=180)
+                
+                # Check status
+                if receipt['status'] == 1:
+                    return f"Successfully deposited {params.amount} {token_id.upper()} to margin account. Transaction hash: {tx_hash}"
+                else:
+                    logger.error(f"Deposit transaction failed. Hash: {tx_hash}, Receipt: {receipt}")
+                    return f"Margin deposit transaction failed. Transaction hash: {tx_hash}"
+            except Exception as e:
+                logger.error(f"Error in deposit transaction: {str(e)}")
+                return f"Error during deposit: {str(e)}"
             
         except Exception as e:
-            return f"Failed to deposit to margin account: {str(e)}"
+            logger.error(f"Unexpected error in deposit_margin: {str(e)}")
+            return f"Unexpected error: {str(e)}"
     
     @create_action(
         name="view-margin-balance",
@@ -909,6 +1051,33 @@ Important notes:
             
         except Exception as e:
             return f"Failed to get portfolio details: {str(e)}"
+
+    @create_action(
+        name="test-connection",
+        description="Test the connection to the Kuru network",
+        schema=OrderbookParams  # Reusing this schema as it has network_id
+    )
+    def test_connection(self, wallet_provider: EvmWalletProvider, args: Dict[str, Any]) -> str:
+        """Test connection to the Kuru network"""
+        params = OrderbookParams(**args)
+        network_id = params.network_id
+        
+        # Get chain id
+        chain_id = NETWORK_ID_TO_CHAIN_ID.get(network_id)
+        if not chain_id:
+            return f"Unsupported network: {network_id}"
+        
+        # Try to initialize Web3
+        if not self._initialize_web3(chain_id):
+            return f"Failed to initialize Web3 for network {network_id}. Please check your RPC configuration."
+        
+        # Try to get the block number
+        try:
+            web3 = self.web3_providers[chain_id]
+            block_number = web3.eth.block_number
+            return f"Successfully connected to {network_id} (chain ID: {chain_id}). Current block number: {block_number}"
+        except Exception as e:
+            return f"Connected to RPC but failed to get block number: {str(e)}"
 
 def kuru_action_provider(
     rpc_url_by_chain_id: Optional[Dict[int, str]] = None,
