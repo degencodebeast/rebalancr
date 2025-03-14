@@ -5,17 +5,12 @@ from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, validator, model_validator
 
+from .constants import DEPOSITABLE_TOKENS  # Import from constants instead of defining here
+
 # Define literals based on constants
 SUPPORTED_TOKENS_LITERAL = Literal["usdc", "usdt", "dak", "chog", "yaki", "native"]
 SUPPORTED_MARKETS_LITERAL = Literal["mon-usdc", "dak-mon", "chog-mon", "yaki-mon"]
 SUPPORTED_NETWORKS_LITERAL = Literal["monad-testnet", "base-sepolia", "base-mainnet"]
-
-# Tokens that can be deposited by network
-DEPOSITABLE_TOKENS = {
-    "monad-testnet": ["native"],  # Only MON can be deposited on Monad testnet
-    "base-sepolia": ["native", "usdc", "usdt"],  # Example for Base Sepolia
-    "base-mainnet": ["native", "usdc", "usdt"]  # Example for Base Mainnet
-}
 
 class SwapParams(BaseModel):
     """Parameters for swap action."""

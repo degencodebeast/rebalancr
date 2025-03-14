@@ -2,17 +2,24 @@
 import json
 import os
 from pathlib import Path
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Define the path to the ABI files
+ABIS_DIR = os.path.join(os.path.dirname(__file__), "abis")
 
 # Load ABI from JSON file
-def load_abi(filename):
-    """Load ABI from JSON file"""
-    current_dir = Path(__file__).parent
-    abi_path = current_dir / "abis" / filename
+def load_abi(file_name):
+    """Load ABI from file"""
     try:
-        with open(abi_path, 'r') as f:
-            return json.load(f)
+        with open(os.path.join(ABIS_DIR, file_name), 'r') as f:
+            abi_json = json.load(f)
+            # Extract just the ABI array from the JSON file
+            return abi_json['abi'] if 'abi' in abi_json else abi_json
     except Exception as e:
-        print(f"Warning: Could not load ABI file {filename}: {e}")
+        logger.error(f"Error loading ABI file {file_name}: {str(e)}")
         return []
 
 # Supported networks
@@ -71,12 +78,12 @@ KURU_CONTRACT_ADDRESSES = {
     }
 }
 
-# # Default RPC URLs for each chain
-# DEFAULT_RPC_URLS = {
-#     8453: "https://base-mainnet.public.blastapi.io",  # Base Mainnet
-#     84532: "https://sepolia.base.org",  # Base Sepolia
-#     10143: "https://testnet-rpc.monad.xyz",  # Monad Testnet
-# }
+# Default RPC URLs for each chain
+DEFAULT_RPC_URLS = {
+    8453: "https://base-mainnet.public.blastapi.io",  # Base Mainnet
+    84532: "https://sepolia.base.org",  # Base Sepolia
+    10143: "https://testnet-rpc.monad.xyz",  # Monad Testnet
+}
 
 # Load ABIs
 MARGIN_ACCOUNT_ABI = load_abi('margin_account.json')
@@ -221,7 +228,7 @@ ERC20_ABI = IERC20_ABI
 #     {
 #         "inputs": [
 #             {"internalType": "address", "name": "token", "type": "address"},
-#             {"internalType": "uint256", "name": "amount", "type": "uint256"}
+#             {"internalType": "uint264", "name": "amount", "type": "uint256"}
 #         ],
 #         "name": "withdraw",
 #         "outputs": [],
@@ -279,11 +286,9 @@ ERC20_ABI = [
     }
 ]
 
-# Add this definition
-DEFAULT_RPC_URLS = {
-    "42161": "https://arb1.arbitrum.io/rpc",  # Arbitrum One
-    "421613": "https://goerli-rollup.arbitrum.io/rpc",  # Arbitrum Goerli
-    "1": "https://eth.llamarpc.com",  # Ethereum Mainnet
-    "5": "https://rpc.ankr.com/eth_goerli",  # Ethereum Goerli
-    "10143": "https://testnet-rpc.monad.xyz",  # Monad Testnet
+# Tokens that can be deposited by network
+DEPOSITABLE_TOKENS = {
+    "monad-testnet": ["native"],  # Only MON can be deposited on Monad testnet
+    "base-sepolia": ["native", "usdc", "usdt"],  # Example for Base Sepolia
+    "base-mainnet": ["native", "usdc", "usdt"]  # Example for Base Mainnet
 }
