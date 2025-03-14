@@ -32,6 +32,94 @@ Rebalancr solves these challenges through three innovative components:
    - Sub-second finality on Monad
    - MEV-protected trading
 
+## 🧠 AI-Powered Portfolio Management
+
+Rebalancr leverages advanced AI through multiple components:
+
+### 1. Market Intelligence
+- **Allora Integration**
+  - Real-time market sentiment analysis
+  - Asset-specific price predictions
+  - Manipulation detection algorithms
+  - Fear/greed index monitoring
+
+- **Statistical Analysis**
+  - Volatility correlation modeling
+  - Market condition classification
+  - Asset-specific behavioral patterns
+  - Risk-adjusted performance metrics
+
+### 2. Decision Engine
+```python
+class IntelligenceEngine:
+    """AI-powered decision making system"""
+    
+    async def analyze_portfolio(self, user_id: str, portfolio_id: int):
+        # Combine Allora predictions with statistical analysis
+        sentiment_data = await self.allora_client.get_market_sentiment(asset)
+        stats_data = await self.market_analyzer.analyze_asset(asset)
+        
+        # Calculate optimal positions using AI models
+        combined_score = self._calculate_combined_score(
+            sentiment_data, stats_data, asset_profile
+        )
+        
+        return {
+            "rebalance_needed": combined_score > 0.7,
+            "confidence": combined_score,
+            "recommendations": self._generate_recommendations(analysis)
+        }
+```
+
+### 3. Autonomous Features
+- **Smart Rebalancing**
+  - AI-timed trade execution
+  - Dynamic threshold adjustment
+  - Multi-factor opportunity scoring
+  - Automated risk management
+
+- **Performance Optimization**
+  - Self-adjusting weights based on outcomes
+  - Learning from historical trades
+  - Continuous strategy refinement
+  - Adaptive risk parameters
+
+### 4. AI Architecture
+```plaintext
+┌─────────────────┐    ┌──────────────┐    ┌────────────────┐
+│ Allora AI       │───▶│ Intelligence │───▶│ Strategy       │
+│ - Predictions   │    │    Engine    │    │   Engine       │
+│ - Sentiment     │    │ (Decision    │    │ (Execution     │
+│ - Market Data   │    │  Making)     │    │  Logic)        │
+└─────────────────┘    └──────────────┘    └────────────────┘
+         ▲                    │                     │
+         │                    ▼                     ▼
+┌─────────────────┐    ┌──────────────┐    ┌────────────────┐
+│ Market Analysis │    │    Risk      │    │  Performance   │
+│ - Statistics    │────▶  Management  │────▶   Tracking     │
+│ - Patterns      │    │   System     │    │   & Learning   │
+└─────────────────┘    └──────────────┘    └────────────────┘
+```
+
+### 5. Key AI Features
+- **Predictive Analytics**
+  - Market trend prediction
+  - Volatility forecasting
+  - Optimal entry/exit timing
+  - Risk factor analysis
+
+- **Adaptive Learning**
+  - Performance-based weight adjustment
+  - Strategy effectiveness tracking
+  - Continuous model refinement
+  - Market condition adaptation
+
+- **Risk Intelligence**
+  - Multi-factor risk scoring
+  - Dynamic circuit breakers
+  - Correlation-based diversification
+  - Market manipulation detection
+
 ## 🏗 Architecture
 
 ```plaintext
