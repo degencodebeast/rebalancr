@@ -81,6 +81,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def startup_event():
     """Initialize the database and run migrations"""
     await app.state.db_manager.initialize()
+    
     # Start portfolio monitoring in background
     background_tasks = BackgroundTasks()
     background_tasks.add_task(
@@ -88,6 +89,31 @@ async def startup_event():
         app.state.db_manager, 
         app.state.strategy_engine
     )
+    
+    # Initialize all services once at startup
+    from .dependencies import initialize_intelligence_services
+    initialize_intelligence_services()
+
+    # Get the service
+    from rebalancr.api.dependencies import get_agent_kit_service
+    service = get_agent_kit_service()
+    
+    # Log basic info before initialization
+    logger.info("STARTUP: Initializing rebalancer provider")
+    
+    # Complete rebalancer initialization - this already regenerates tools internally
+    service._complete_rebalancer_initialization()
+    #logger.info(service.tools)
+    
+    # Just log the tools for verification
+    tool_names = [t.name for t in service.tools]
+    logger.info(tool_names)
+    rebalancer_tools = [name for name in tool_names if name.startswith('rebalancer')]
+    
+    if rebalancer_tools:
+        logger.info(f"Rebalancer tools available: {rebalancer_tools}")
+    else:
+        logger.warning("No rebalancer tools found with 'rebalancer' prefix")
 
 @app.on_event("shutdown")
 async def shutdown_db():

@@ -86,7 +86,7 @@ DEFAULT_RPC_URLS = {
 }
 
 # Load ABIs
-MARGIN_ACCOUNT_ABI = load_abi('margin_account.json')
+MARGIN_ACCOUNT_ABI = load_abi('kuru_margin.json')
 KURU_MARKET_ABI = load_abi('order_book.json')
 KURU_FORWARDER_ABI = load_abi('kuru_forwarder.json')
 IERC20_ABI = load_abi('ierc20.json')

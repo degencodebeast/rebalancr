@@ -25,6 +25,7 @@ from .schemas import (
     SUPPORTED_NETWORKS_LITERAL,
 )
 from .constants import (
+    ERC20_ABI,
     TOKEN_ADDRESSES, 
     MARKET_ADDRESSES,
     DEFAULT_RPC_URLS, 

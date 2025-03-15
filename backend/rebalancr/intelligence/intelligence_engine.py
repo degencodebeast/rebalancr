@@ -63,10 +63,6 @@ class IntelligenceEngine:
         # Performance tracking for self-improvement
         self.performance_history = {}
 
-        # If agent_kit_client is provided, set intelligence_engine reference
-        if self.agent_kit_client:
-            self.agent_kit_client.set_intelligence_engine(self)
-
     #            # Weights for different signals (statistical vs AI)
     #     # Starting with equal weights as Rose Heart suggested
     #     self.signal_weights = {

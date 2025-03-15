@@ -57,21 +57,20 @@ class AgentManager:
             cls._instance = cls(config)
         return cls._instance
     
-    def __init__(self, settings: Settings):
+    def __init__(self, config):
         """Initialize the AgentManager with settings"""
-        self.settings = settings
-        self.sqlite_path = settings.sqlite_db_path or "sqlite:///conversations.db"
-        self.wallet_data_dir = settings.wallet_data_dir or "./data/wallets"
+        self.settings = config
+        self.sqlite_path = config.sqlite_db_path or "sqlite:///conversations.db"
+        self.wallet_data_dir = config.wallet_data_dir or "./data/wallets"
         
         # Initialize direct instances instead of using getters
         self.db_manager = DatabaseManager()  # Direct init instead of get_db_manager()
         self.history_manager = ChatHistoryManager(db_manager=self.db_manager)  # Direct init
         
         # Initialize PrivyWalletProvider instead of CDP wallet provider
-        self.wallet_provider = PrivyWalletProvider.get_instance(settings)
+        self.wallet_provider = PrivyWalletProvider.get_instance(config)
 
-        from .service import AgentKitService
-        self.service = AgentKitService.get_instance(settings)
+        self.service = None  # Initialize as None
 
         # Ensure wallet data directory exists
         os.makedirs(self.wallet_data_dir, exist_ok=True)
@@ -254,4 +253,9 @@ class AgentManager:
         # Store in database via history manager
         return await self.history_manager.store_message(
             user_id, message, message_type, conversation_id
-        ) 
+        )
+
+    def set_service(self, service):
+        """Set the AgentKitService after initialization"""
+        self.service = service
+        # Any initialization that depends on service should be here 
