@@ -261,4 +261,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<p align="center">Built with ❤️ for Monad Hackathon 2025</p> 
+<p align="center">Built with ❤️ for Monad evm/acc Hackathon 2025</p> 
